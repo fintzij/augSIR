@@ -1,0 +1,3 @@
+useDynLib(augSIR)
+exportPattern("^[[:alpha:]]+")
+importFrom(Rcpp, evalCpp)
