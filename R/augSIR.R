@@ -136,9 +136,9 @@ drawXt <- function(Xother, irm, W, p, b, m, a, initdist){
     
     Xt <- cbind(W[,1], 0); Xt.fb <- array(0,dim=c(3,3,dim(Xt)[1]-1))
     
-    if (sum(Xother[,3][Xother[,1]==0])<W[1,2]) {
-        initdist <- c(0,1,0)
-    } 
+#     if (sum(Xother[,3][Xother[,1]==0])<W[1,2]) {
+#         initdist <- c(0,1,0)
+#     } 
     
     Xt.fb[,,1] <- fwd(Xother, W, irm, distr=initdist, p=p, t0=W[1,1], t1 = W[2,1])
     
@@ -309,14 +309,107 @@ updateX <- function(X, Xt.path, j){
     return(X)
 }
 
+# getpath extracts the current path for subject j
+getpath <- function(X.cur, j) {
+    
+    if(all(X.cur[X.cur[,2]==j,3]==0)){ # first the case when no infection is observed
+        cur.path <- c(0,0)
+        
+    } else if(X.cur[X.cur[,2]==j,3][1]==1 & X.cur[X.cur[,2]==j,3][2]==0){ # then the case when an infection but no recovery is observed
+        cur.path <- c(X.cur[X.cur[,2]==j,1][1],Inf)
+        
+    } else if(X.cur[X.cur[,2]==j,3][1] == 1 & X.cur[X.cur[,2]==j,3][2] == -1) { # finally when both an infection and a recovery are observed
+        cur.path <- c(X.cur[X.cur[,2]==j,1])
+    }
+}
 
 # Other functions ---------------------------------------------------------
 
-calc_loglike <- function(X, W, b, m, a, p){
-    popsize = length(unique(X[,2])); times <- unique(X[,1]); timediffs <- times[2:length(times)] - times[1:(length(times)-1)]
+calc_loglike <- function(X, W, b, m, a=0, p){
+#     popsize = length(unique(X[,2])); times <- unique(X[,1]); timediffs <- times[2:length(times)] - times[1:(length(times)-1)]
     Xobs <- rbind(c(0,0,sum(X[X[,1]==0,3])), X[X[,1]!=0,]); irm <- buildirm(X, b, m, a, pop=TRUE)
     
     events <- ifelse(Xobs[Xobs[,1]!=0,3]==1, 1,2); rates <- ifelse(events==1,irm[1,2,], irm[2,3,])
     
-    dbinom(sum(W[,2]), sum(W[,3]), prob=p, log=TRUE) + sum(log(rates)) + sum(rates*(Xobs[2:dim(Xobs)[1],] - Xobs[1:(dim(Xobs)[1]-1)]))
+    dbinom(sum(W[,2]), sum(W[,3]), prob=p, log=TRUE) + sum(log(rates)) - sum(rates*(Xobs[2:dim(Xobs)[1],1] - Xobs[1:(dim(Xobs)[1]-1),1]))
 } 
+
+# pop_prob and path_prob calculate the log-probabilities of the population trajectory and the subject trajectory for use in the M-H ratio
+
+pop_prob <- function(X, irm, initdist){
+    Xobs <- rbind(c(0,0,sum(X[X[,1]==0,3])), X[X[,1]!=0,])
+    events <- ifelse(Xobs[Xobs[,1]!=0,3]==1, 1,2); rates <- ifelse(events==1,irm[1,2,], irm[2,3,])
+    
+    sum(log(rates)) - sum(rates*(Xobs[2:dim(Xobs)[1],1] - Xobs[1:(dim(Xobs)[1]-1),1]))
+}
+
+path_prob <- function(path, Xother, irm.other, initdist, tmax){
+    if(all(path==0)){ # no infection observed
+        times <- unique(Xother[,1]); timediffs <- times[2:length(times)] - times[1:(length(times)-1)]
+        path.prob <- log(initdist[1])-sum(irm.other[1,2,] * timediffs)
+            
+    } else if(path[2] > 0 & path[2] < Inf) { # subject is infected and recovery is observed
+        
+        if(path[1]==0){ # subject is initially infected 
+            
+            path.prob <- log(initdist[2]) + log(irm.other[2,3,1]) - irm.other[2,3,1]*path[2]
+            
+        } else if(path[1]!=0){ # subject is not initially infected
+            
+            times <- unique(Xother[,1]); timediffs <- times[2:length(times)] - times[1:(length(times)-1)]
+            
+            if(times[2] > path[1]){ # no changes in number of infecteds before subject's infection
+                
+                path.prob <- log(initdist[1]) + log(irm.other[1,2,1]) - irm.other[1,2,1]*path[1] + log(irm.other[2,3,1]) - irm.other[2,3,1]*(path[2] - path[1])
+                
+            } else if(times[2] < path[1]){ # if there is at least one change in the number of infecteds before the subject's infection
+                
+                path.prob <- log(initdist[1]) - sum(irm.other[1,2,which(times < path[1])] * timediffs[which(times < path[1])]) +
+                    log(irm.other[1, 2, Position(function(y) y>= path[1], times) - 1]) - irm.other[1,2,Position(function(y) y>= path[1], times) - 1] * (path[1] - times[Position(function(y) y>path[1], times) - 1]) +
+                    log(irm.other[2,3,1]) - irm.other[2,3,1]*(path[2] - path[1])
+                
+            }
+        }
+        
+    } else if(path[2] == Inf) { # subject is infected and no recovery is observed
+        
+        if(path[1]==0){ # subject is initially infected 
+            
+            path.prob <- log(initdist[2]) - irm.other[2,3,1]*tmax
+            
+        } else if(path[1]!=0){ # subject is not initially infected
+            
+            times <- unique(Xother[,1]); timediffs <- times[2:length(times)] - times[1:(length(times)-1)]
+            
+            if(times[2] > path[1]){ # no changes in number of infecteds before subject's infection
+                
+                path.prob <- log(initdist[1]) + log(irm.other[1,2,1]) - irm.other[1,2,1]*path[1] - irm.other[2,3,1]*(tmax - path[1])
+                
+            } else if(times[2] < path[1]){ # if there is at least one change in the number of infecteds before the subject's infection
+                
+                path.prob <- log(initdist[1]) - sum(irm.other[1,2,which(times < path[1])] * timediffs[which(times < path[1])]) +
+                    log(irm.other[1, 2, Position(function(y) y>= path[1], times) - 1]) - irm.other[1,2,Position(function(y) y>= path[1], times) - 1] * (path[1] - times[Position(function(y) y>path[1], times) - 1]) -
+                    irm.other[2,3,1]*(tmax - path[1])
+                
+            }
+        }
+    } 
+    
+    return(path.prob)
+}
+# checkpossible checks whether removing a subject to resimulate the epidemic would cause an impossible population trajectory. If so, M-H automatically rejects.
+
+checkpossible <- function(Xother, a=0){
+    popseq <-c(sum(Xother[Xother[,1]==0,3]), sum(Xother[Xother[,1]==0,3]) + cumsum(Xother[Xother[,1]!=0,3]))
+    if(any(popseq==0) & a==0){
+        if(any(which(popseq==0)!=length(popseq)) == TRUE){
+            is.possible <-FALSE
+        } else if(any(which(popseq==0)!=length(popseq)) == FALSE){
+            is.possible <- TRUE
+        }
+    } else {
+        is.possible <- TRUE
+    }
+    return(is.possible)
+}
+
