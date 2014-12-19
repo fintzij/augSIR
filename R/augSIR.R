@@ -158,7 +158,11 @@ fwd <- function(Xother, W, irm, P.prev=NULL, distr=NULL, p, t0, t1){
     P.now <- matrix(0, nrow=3,ncol=3);
     if(is.null(distr)) distr <- colSums(P.prev)
     tpm <- obstpm(Xother,irm,t0,t1)
-    emit<- dbinom(W[W[,1]==t1,2],sum(Xother[,3][Xother[,1]<=t1])+(1:3==2),p)
+    if(p!=1) {
+        emit <- dbinom(W[W[,1]==t1,2],sum(Xother[which(Xother[,1]<=t1),3])+(1:3==2),p)
+        } else {
+            emit <- c(1,1,1)
+        }
     P.now<-normalize(outer(distr,emit,FUN="*")*tpm)
     return(P.now)
 }
@@ -244,31 +248,57 @@ numinfected <- function(X){
 # controls the factor by which the observed number of infecteds is multiplied to get the number of initialized trajectories (up to the population size)
 # X is matrix with event times, subject id and event codes. 
 # Event codes: 1=carriage aquired, -1=carriage infected, 0=event out of time range
-initializeX <- function(dat, mu, p, amplify, tmax){
-    whichsick <- sample(1:popsize,max(sum(W[,2]),min(popsize,floor(sum(dat[,2])/(amplify*p)))))
+initializeX <- function(W, mu, p, amplify, tmax){
+    whichsick <- sample(1:popsize,min(popsize,floor(sum(W[,2])/(amplify*p))))
     
     X <- as.matrix(data.frame(time=rep(0,popsize*2), id=rep(1:popsize,each=2), event=rep(0,2*popsize)))
     
-    for(k in 1:dim(dat)[1]){
-        if(dat[k,2]!=0) {
-            nowsick <- sample(whichsick,dat[k,2]); whichsick <- whichsick[-which(whichsick %in% nowsick)]
-            
-            for(j in 1:length(nowsick)){
-                ind <- which(X[,2] == nowsick[j])
-                if(k ==1){    
-                    X[ind,1][1] <- 0; X[ind,3][1]<-1
-                    tau = rexp(1,rate=mu)
-                    X[ind,1][2]<-ifelse(tau>tmax,0,tau)
-                    X[ind,3][2] <- ifelse(tau>tmax,0,-1)
-                } else{
-                    tau = rexp(1,rate=mu); eventtime <- runif(1,0, tau)
-                    
-                    X[ind,1][1] <- max(0,dat[k,1] - eventtime); X[ind,3][1] <- 1
-                    
-                    X[ind,1][2]<-ifelse(dat[k,1] + (tau-eventtime)>tmax,0,dat[k,1] + (tau-eventtime))
-                    X[ind,3][2] <- ifelse(dat[k,1] + (tau-eventtime)>tmax,0,-1)
+    for(k in 1:dim(W)[1]){
+        if(W[k,2]!=0) {
+            if(length(whichsick) < (W[k,2] - sum(X[which(X[,1]<W[k,1]),3]))){
+                numneeded <-W[k,2] - sum(X[which(X[,1]<=W[k,1]),3]) - length(whichsick); selected <- rep(0,numneeded)
+                ids <- 1:popsize; ids <- ids[!ids %in% whichsick]
+                for(r in 1:numneeded){
+                    noexcess <- which(W[,3]<=W[,2]); noexcess.times <- W[noexcess,1]
+                    keepchoosing <- TRUE
+                    while(keepchoosing==TRUE){
+                        proposed <- sample(ids, 1)
+                        proposed.path <- getpath(X, proposed)
+                        if(!any(proposed.path[1] < noexcess.times & proposed.path[2]>noexcess.times)){
+                            selected[r] <- proposed
+                            ids <- ids[!ids==proposed]
+                            X <- updateX(X, c(0,0), proposed)
+                            W <- updateW(W, X)
+                            keepchoosing <- FALSE
+                        } else {
+                            ids <- ids[!ids==proposed]
+                            keepchoosing<-TRUE
+                        }
+                    }
                 }
+                whichsick <- c(whichsick,selected)
             }
+            if(sum(X[X[,1]<=W[k,1],3]) <= W[k,2]){
+                nowsick <- sample(whichsick,max(0,W[k,2] - sum(X[X[,1]<=W[k,1],3]))); whichsick <- whichsick[-which(whichsick %in% nowsick)]
+                
+                for(j in 1:length(nowsick)){
+                    ind <- which(X[,2] == nowsick[j])
+                    if(k == 1){    
+                        X[ind,1][1] <- 0; X[ind,3][1]<-1
+                        tau <- rexp(1,rate=mu)
+                        X[ind,1][2]<-ifelse(tau>tmax,0,tau)
+                        X[ind,3][2] <- ifelse(tau>tmax,0,-1)
+                    } else{
+                        tau <- rexp(1,rate=mu); eventtime <- runif(1,0, tau)
+                        
+                        X[ind,1][1] <- max(0,W[k,1] - eventtime); X[ind,3][1] <- 1
+                        
+                        X[ind,1][2]<-ifelse((W[k,1] + (tau-eventtime - min(0,W[k,1]-eventtime)))>tmax,0,W[k,1] + (tau-eventtime- min(0,W[k,1]-eventtime)))
+                        X[ind,3][2] <- ifelse(W[k,1] + (tau-eventtime - min(0,W[k,1]-eventtime))>tmax,0,-1)
+                    }
+                }   
+            } # else next
+            W <- updateW(W, X); print(W)           
         }   
     }
     
@@ -281,7 +311,7 @@ initializeX <- function(dat, mu, p, amplify, tmax){
 # with columns containing observation times, number of infecteds observed, and number of infecteds based on augmented trajectories. 
 updateW <- function(W, X){
     for(k in 1:dim(W)[1]){
-        W[k,3] <- sum(X[,3][X[,1]<=W[k,1]])
+        W[k,3] <- sum(X[which(X[,1]<=W[k,1]),3])
     }
     return(W)
 }
@@ -399,8 +429,8 @@ path_prob <- function(path, Xother, irm.other, initdist, tmax){
 }
 # checkpossible checks whether removing a subject to resimulate the epidemic would cause an impossible population trajectory. If so, M-H automatically rejects.
 
-checkpossible <- function(Xother, a=0){
-    popseq <-c(sum(Xother[Xother[,1]==0,3]), sum(Xother[Xother[,1]==0,3]) + cumsum(Xother[Xother[,1]!=0,3]))
+checkpossible <- function(X, a=0, W=NULL, init=FALSE){
+    popseq <-c(sum(X[X[,1]==0,3]), sum(X[X[,1]==0,3]) + cumsum(X[X[,1]!=0,3]))
     if(any(popseq==0) & a==0){
         if(any(which(popseq==0)!=length(popseq)) == TRUE){
             is.possible <-FALSE
@@ -409,6 +439,13 @@ checkpossible <- function(Xother, a=0){
         }
     } else {
         is.possible <- TRUE
+    }
+    
+    if(!is.null(W)){
+        W <- updateW(W,X)
+        if(any(W[,3]<W[,2])){
+            is.possible <- FALSE
+        }
     }
     return(is.possible)
 }
