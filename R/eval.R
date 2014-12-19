@@ -53,8 +53,8 @@ X.cur <- initializeX(W.cur, Mu[1], probs[1], 1, tmax=20)
 # update observation matrix
 W.cur <- updateW(W.cur,X.cur)
 
-if(!checkpossible(X=X.cur, W=W.cur,init=TRUE)) {
-    while(!checkpossible(X=X.cur,W=W.cur,init=TRUE)){
+if(!checkpossible(X=X.cur, W=W.cur)) {
+    while(!checkpossible(X=X.cur,W=W.cur)){
         X.cur <- initializeX(W.cur, Mu[1], probs[1], 1, tmax=20)
         W.cur <- updateW(W.cur,X.cur)
     }
