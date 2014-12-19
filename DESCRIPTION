@@ -11,3 +11,4 @@ Imports: Rcpp,
     RcppArmadillo,
     ggplot2,
     reshape2
+LinkingTo: Rcpp, RcppArmadillo

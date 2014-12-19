@@ -153,7 +153,7 @@ ggplot(dat.m2,aes(x=time,y=value,colour=variable))+geom_point() + theme_bw()
 # initialize simulation settings
 popsize <- 200 # size of the population; 
 tmax <- 20 # maximum time of observation
-niter <- 1000 # number of iterations in the sampler
+niter <- 100 # number of iterations in the sampler
 initdist <- c(0.995,0.005,0) # initial distribution for individual infection status
 
 # vectors for parameters
@@ -288,7 +288,7 @@ ggplot(dat.m3,aes(x=time,y=value,colour=variable))+geom_point() + theme_bw()
 # initialize simulation settings
 popsize <- 200 # size of the population; 
 tmax <- 20 # maximum time of observation
-niter <- 1000 # number of iterations in the sampler
+niter <- 100 # number of iterations in the sampler
 initdist <- c(0.995,0.005,0) # initial distribution for individual infection status
 
 # vectors for parameters
