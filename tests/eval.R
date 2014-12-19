@@ -2,9 +2,6 @@
 ### eval.R contains commands to test functionality of the package. ###
 ######################################################################
 
-require(ggplot2)
-require(reshape2)
-
 # Simulate data -----------------------------------------------------------
 
 SIRres<-SIRsim(N = 200, S0 = 199, I0 = 1, b = 0.01, mu=.5, a=0, maxtime = 365,censusInterval=14);

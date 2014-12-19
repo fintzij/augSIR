@@ -1,7 +1,5 @@
 # evaluating how well the method reconstructs the true trajectory
 
-require(ggplot2)
-require(reshape2)
 
 # Simulate data, first for the case where we observe without error ----------------------------------------------
 
