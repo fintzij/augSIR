@@ -195,7 +195,6 @@ normalize <- function(X){
 # buildirm constructs the instantaneous rate matrices for use in the forward backward algorith
 buildirm <- function(X, b, m, a, pop=FALSE){
     Xobs <- rbind(c(0,0,sum(X[X[,1]==0,3])), X[X[,1]!=0,]); times <- unique(Xobs[,1])
-    infections <- which(Xobs[Xobs[,1]!=0,3]==1); recoveries <- which(Xobs[,3]==-1) - 1 # vectors indexing which event times are infections and which are recoveries, indexed to time j-1
     numsusc <- popsize - cumsum(Xobs[,3]==1) - Xobs[1,3]; numinf <- cumsum(Xobs[,3]) #cumulative counts of the numbers of infecteds and recoverds at event times
     
     #   check if the infection has died off. ensure that the number of infecteds is zero forever after.
@@ -232,8 +231,13 @@ obstpm <- function(Xother, irm, t0, t1){
         times <- unique(Xother[,1])
     } else times <- c(0, unique(Xother[,1]))
     for (k in 1:(length(timeseq)-1)) {
-        ind1 <- sum(times<=timeseq[k])
-        tpm <- tpm %*% buildtpm(irm[,,ind1],timeseq[k],timeseq[k+1])
+        ind1 <- sum(times<=timeseq[k]); 
+        if(ind1 <= dim(irm)[3]){
+            irm1 <- irm[,,ind1]
+        } else if(ind1 > dim(irm)[3]){
+            irm1 <- diag(0,3); irm1[2,3] <- irm[2,3,dim(irm)[3]]; irm1[2,2] <- -irm1[2,3]
+        }
+        tpm <- tpm %*% buildtpm(irm1,timeseq[k],timeseq[k+1])
     } 
     return(tpm)
 }
@@ -297,8 +301,7 @@ initializeX <- function(W, mu, p, amplify, tmax){
                         X[ind,3][2] <- ifelse(W[k,1] + (tau-eventtime - min(0,W[k,1]-eventtime))>tmax,0,-1)
                     }
                 }   
-            } # else next
-            W <- updateW(W, X); print(W)           
+            } else next          
         }   
     }
     
@@ -429,7 +432,7 @@ path_prob <- function(path, Xother, irm.other, initdist, tmax){
 }
 # checkpossible checks whether removing a subject to resimulate the epidemic would cause an impossible population trajectory. If so, M-H automatically rejects.
 
-checkpossible <- function(X, a=0, W=NULL, init=FALSE){
+checkpossible <- function(X, a=0, W=NULL){
     popseq <-c(sum(X[X[,1]==0,3]), sum(X[X[,1]==0,3]) + cumsum(X[X[,1]!=0,3]))
     if(any(popseq==0) & a==0){
         if(any(which(popseq==0)!=length(popseq)) == TRUE){

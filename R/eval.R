@@ -7,11 +7,11 @@ require(reshape2)
 
 # Simulate data -----------------------------------------------------------
 
-SIRres<-SIRsim(N = 200, S0 = 199, I0 = 1, b = 0.01, mu=.5, a=0, maxtime = 56,censusInterval=2);
+SIRres<-SIRsim(N = 200, S0 = 199, I0 = 1, b = 0.01, mu=.5, a=0, maxtime = 365,censusInterval=14);
 SIRres = cbind(SIRres,200 - rowSums(SIRres[,2:3]))
 colnames(SIRres)<-c("time","susceptible","infected","recovered")
 
-# get data and add some noise
+# get data 
 dat <- data.frame(SIRres); dat$infected<-rbinom(n=dim(dat)[1], size=dat$infected, prob=1)
 dat.m <- melt(dat,id.vars="time")
 
