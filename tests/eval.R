@@ -69,30 +69,27 @@ for(k in 1:(niter-1)){
   
   for(j in 1:length(subjects)){
       print(j)
-      Xother <- X.cur[X.cur[,2]!=subjects[j],]; 
-      if(checkpossible(Xother) == TRUE){
-          
-          path.cur <- getpath(X.cur, subjects[j])
-          
-          W.other <-updateW(W.cur, Xother)
-          irm.other <- buildirm(Xother, b=Beta[k], m = Mu[k], a=Alpha[k])
-          Xt <- drawXt(Xother = Xother, irm = irm.other, W=W.other, p=probs[k], b=Beta[k], m=Mu[k], a=Alpha[k], initdist = initdist)
-          
-          path.new<- drawpath(Xt, Xother, irm.other, tmax)
-          
-          X.new <- updateX(X.cur,path.new,subjects[j]); path.new <- getpath(X.new,subjects[j])
-          irm.new <- buildirm(X.new, b = Beta[k], m = Mu[k], a = Alpha[k])
-          
-          a.prob <- pop_prob(X.new, irm = irm.new) - pop_prob(X.cur, irm = irm.cur) + 
-              path_prob(path.cur, Xother, irm.other, initdist, tmax) - path_prob(path.new, Xother, irm.other, initdist, tmax)
-          
-          if(min(a.prob, 0) > log(runif(1))) {
-              X.cur <- X.new
-              W.cur <- updateW(W.cur,X.cur)
-              irm.cur <- irm.new
-          }
-          
-      } else next
+      Xother <- X.cur[X.cur[,2]!=subjects[j],]
+      
+      path.cur <- getpath(X.cur, subjects[j])
+      
+      W.other <-updateW(W.cur, Xother)
+      irm.other <- buildirm(Xother, b=Beta[k], m = Mu[k], a=Alpha[k])
+      Xt <- drawXt(Xother = Xother, irm = irm.other, W=W.other, p=probs[k], b=Beta[k], m=Mu[k], a=Alpha[k], initdist = initdist)
+      
+      path.new<- drawpath(Xt, Xother, irm.other, tmax)
+      
+      X.new <- updateX(X.cur,path.new,subjects[j]); path.new <- getpath(X.new,subjects[j])
+      irm.new <- buildirm(X.new, b = Beta[k], m = Mu[k], a = Alpha[k])
+      
+      a.prob <- pop_prob(X.new, irm = irm.new) - pop_prob(X.cur, irm = irm.cur) + 
+          path_prob(path.cur, Xother, irm.other, initdist, tmax) - path_prob(path.new, Xother, irm.other, initdist, tmax)
+      
+      if(min(a.prob, 0) > log(runif(1))) {
+          X.cur <- X.new
+          W.cur <- updateW(W.cur,X.cur)
+          irm.cur <- irm.new
+      }
   }
     
   # Update observation matrix
