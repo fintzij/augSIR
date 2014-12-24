@@ -16,7 +16,7 @@ ggplot(dat.m,aes(x=time,y=value,colour=variable))+geom_point() + theme_bw()
 # initialize simulation settings
 popsize <- 200 # size of the population; 
 tmax <- 20 # maximum time of observation
-niter <- 2000 # number of iterations in the sampler
+niter <- 500 # number of iterations in the sampler
 initdist <- c(0.995,0.005,0) # initial distribution for individual infection status
 
 # vectors for parameters
@@ -68,30 +68,26 @@ for(k in 1:(niter)){
     for(j in 1:length(subjects)){
 #         print(j)
         Xother <- X.cur[X.cur[,2]!=subjects[j],]; 
-        if(checkpossible(Xother, a=0, W=W.cur) == TRUE){
-            
-            path.cur <- getpath(X.cur, subjects[j])
-            
-            W.other <-updateW(W.cur, Xother)
-            irm.other <- buildirm(Xother, b=Beta[k], m = Mu[k], a=Alpha[k])
-            Xt <- drawXt(Xother = Xother, irm = irm.other, W=W.other, p=probs[k], b=Beta[k], m=Mu[k], a=Alpha[k], initdist = initdist)
-            
-            path.new<- drawpath(Xt, Xother, irm.other, tmax)
-            
-            X.new <- updateX(X.cur,path.new,subjects[j]); path.new <- getpath(X.new,subjects[j])
-            irm.new <- buildirm(X.new, b = Beta[k], m = Mu[k], a = Alpha[k])
-            
-            a.prob <- pop_prob(X.new, irm = irm.new) - pop_prob(X.cur, irm = irm.cur) + 
-                path_prob(path.cur, Xother, irm.other, initdist, tmax) - path_prob(path.new, Xother, irm.other, initdist, tmax)
-            
-            if(min(a.prob, 0) > log(runif(1))) {
-                X.cur <- X.new
-                W.cur <- updateW(W.cur,X.cur)
-                irm.cur <- irm.new
-                accepts[j] <- 1
-            }
-            
-        } else next
+        path.cur <- getpath(X.cur, subjects[j])
+        
+        W.other <-updateW(W.cur, Xother)
+        irm.other <- buildirm(Xother, b=Beta[k], m = Mu[k], a=Alpha[k])
+        Xt <- drawXt(Xother = Xother, irm = irm.other, W=W.other, p=probs[k], b=Beta[k], m=Mu[k], a=Alpha[k], initdist = initdist)
+        
+        path.new<- drawpath(Xt, Xother, irm.other, tmax)
+        
+        X.new <- updateX(X.cur,path.new,subjects[j]); path.new <- getpath(X.new,subjects[j])
+        irm.new <- buildirm(X.new, b = Beta[k], m = Mu[k], a = Alpha[k])
+        
+        a.prob <- pop_prob(X.new, irm = irm.new) - pop_prob(X.cur, irm = irm.cur) + 
+            path_prob(path.cur, Xother, irm.other, initdist, tmax) - path_prob(path.new, Xother, irm.other, initdist, tmax)
+        
+        if(min(a.prob, 0) > log(runif(1))) {
+            X.cur <- X.new
+            W.cur <- updateW(W.cur,X.cur)
+            irm.cur <- irm.new
+            accepts[j] <- 1
+        }
     }
     
     # Update observation matrix
@@ -136,7 +132,7 @@ for(j in 2:length(results)){
                                          simnum = j))
 }
 
-trajecs.gg <- ggplot(data=dat.init,aes(x=time,y=value)) + geom_point(data=dat.init,aes(colour=variable),size=4) + geom_line(data=trajecs,aes(x=time,y=infected, colour=simnum),alpha=0.1) + theme_bw()
+trajecs.gg <- ggplot(data=subset(dat.m,variable=="infected"),aes(x=time,y=value)) + geom_point(size=4) + geom_line(data=trajecs,aes(x=time,y=infected, colour=simnum),alpha=0.1) + theme_bw()
 
 
 

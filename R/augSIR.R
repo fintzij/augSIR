@@ -136,10 +136,6 @@ drawXt <- function(Xother, irm, W, p, b, m, a, initdist){
     
     Xt <- cbind(W[,1], 0); Xt.fb <- array(0,dim=c(3,3,dim(Xt)[1]-1))
     
-#     if (sum(Xother[,3][Xother[,1]==0])<W[1,2]) {
-#         initdist <- c(0,1,0)
-#     } 
-    
     Xt.fb[,,1] <- fwd(Xother, W, irm, distr=initdist, p=p, t0=W[1,1], t1 = W[2,1])
     
     for(k in 2:(dim(Xt.fb)[3])){
@@ -147,9 +143,12 @@ drawXt <- function(Xother, irm, W, p, b, m, a, initdist){
     }
     
     Xt<-bwd(Xt.fb,Xt)
+    if(all(Xt[,2]==3)){
+        Xt[,2] <- 1
+    }
+    
     return(Xt)
 }
-
 
 # Forward-backward recursion functions ------------------------------------
 
@@ -158,15 +157,20 @@ fwd <- function(Xother, W, irm, P.prev=NULL, distr=NULL, p, t0, t1){
     P.now <- matrix(0, nrow=3,ncol=3);
     if(is.null(distr)) distr <- colSums(P.prev)
     tpm <- obstpm(Xother,irm,t0,t1)
+    numinf.aug <- sum(Xother[which(Xother[,1]<=t1),3]); numinf.obs <- W[W[,1]==t1,2]
     
-    emit <- dbinom(W[W[,1]==t1,2],sum(Xother[which(Xother[,1]<=t1),3])+(1:3==2),p)
+    if(p==1){
+        emit <- dbinom(numinf.obs, min(numinf.aug, numinf.obs) +c(0,1,0),p)
+        
+    } else {
+        emit <- dbinom(numinf.obs, numinf.aug +c(0,1,0),p)
+        
+    }
     
     P.now<-outer(distr,emit,FUN="*")*tpm
-    if(all(P.now==0)){
-        P.now <- diag(1,3)
-    } else { 
-        P.now <- normalize(P.now)
-    }
+    
+    P.now <- normalize(P.now)
+    
     return(P.now)
 }
 
