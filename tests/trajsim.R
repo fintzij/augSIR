@@ -16,7 +16,7 @@ ggplot(dat.m,aes(x=time,y=value,colour=variable))+geom_point() + theme_bw()
 # initialize simulation settings
 popsize <- 200 # size of the population; 
 tmax <- 20 # maximum time of observation
-niter <- 1000 # number of iterations in the sampler
+niter <- 2000 # number of iterations in the sampler
 initdist <- c(0.995,0.005,0) # initial distribution for individual infection status
 
 # vectors for parameters
@@ -136,7 +136,7 @@ for(j in 2:length(results)){
                                          simnum = j))
 }
 
-trajecs.gg <- ggplot(data=subset(dat.m,variable=="infected"),aes(x=time,y=value)) + geom_point(colour="red",size=4) + geom_line(data=trajecs,aes(x=time,y=infected,group=simnum),alpha=0.2) + theme_bw()
+trajecs.gg <- ggplot(data=dat.init,aes(x=time,y=value)) + geom_point(data=dat.init,aes(colour=variable),size=4) + geom_line(data=trajecs,aes(x=time,y=infected, colour=simnum),alpha=0.1) + theme_bw()
 
 
 
@@ -151,7 +151,7 @@ ggplot(dat.m2,aes(x=time,y=value,colour=variable))+geom_point() + theme_bw()
 # initialize simulation settings
 popsize <- 200 # size of the population; 
 tmax <- 20 # maximum time of observation
-niter <- 100 # number of iterations in the sampler
+niter <- 1000 # number of iterations in the sampler
 initdist <- c(0.995,0.005,0) # initial distribution for individual infection status
 
 # vectors for parameters
@@ -160,7 +160,7 @@ Mu <- vector(length = niter+1); Mu[1] <- 0.5 + runif(1,-0.0005,0.0005)
 Alpha <- vector(length = niter+1); Alpha[1] <- 0 
 probs <- vector(length = niter+1); #probs[1] <- 0.2 + runif(1, -0.1, 0.1)
 probs[1] <- 0.2
-
+ 
 results2 <- vector("list",niter)
 # # vectors for parameters of distributions for beta, mu, and p. beta and mu have gamma distributions, p has beta distribution.
 # beta.prior <- c(12, 1200)

@@ -32,7 +32,7 @@ probs[1] <-1
 beta.prior <- c(12, 1200)
 mu.prior <- c(6, 12)
 # alpha.prior <- c(6, 12000)
-# p.prior <- c(9.5, 38)
+p.prior <- c(9.5, 38)
 
 # log-likelihood vector
 loglik <- vector(length=niter)
