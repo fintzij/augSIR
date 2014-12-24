@@ -7,7 +7,7 @@ Author: Jonathan Fintzi
 Maintainer: Jonathan Fintzi <fintzij@uw.edu>
 Description: 
 License: What license is it under? GPL-3
-Imports: Rcpp,
+Depends: Rcpp,
     RcppArmadillo,
     ggplot2,
     reshape2
