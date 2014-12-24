@@ -311,7 +311,7 @@ initializeX <- function(W, mu, p, amplify, tmax){
             } else next          
         }   
     }
-    
+        
     X<-X[order(X[,1]),]
     
     return(X)

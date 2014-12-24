@@ -69,7 +69,7 @@ for(k in 1:(niter)){
     
     for(j in 1:length(subjects)){
 #         print(j)
-        Xother <- X.cur[X.cur[,2]!=subjects[j],]; 
+        Xother <- X.cur[X.cur[,2]!=subjects[j],]
         path.cur <- getpath(X.cur, subjects[j])
         
         W.other <-updateW(W.cur, Xother)
@@ -92,6 +92,7 @@ for(k in 1:(niter)){
         }
     }
     
+    W.cur
     # Update observation matrix
 #     W <- updateW(W, X)
     
@@ -135,7 +136,10 @@ for(j in 2:length(results)){
 }
 
 
-trajecs.gg <- ggplot(data=subset(dat.m,variable=="infected"),aes(x=time,y=value)) + geom_point(size=4) + geom_line(data=trajecs,aes(x=time,y=infected, colour=simnum),alpha=0.1) + theme_bw()
+trajecs.gg <- ggplot(data=subset(dat.m,variable=="infected"),aes(x=time,y=value)) + geom_point(size=4,colour="red") + geom_line(data=trajecs,aes(x=time,y=infected, group=simnum),alpha=0.1) + theme_bw()
+
+dat.infec <-subset(dat.m,variable=="infected")
+trajecs.gg <- ggplot() + geom_line(data=trajecs,aes(x=time,y=infected,group=trajecs$simnum, alpha=0.1),show_guide=FALSE) + geom_point(data=dat.infec, aes(x=time, y=value, colour="red", size=4),show_guide=FALSE)
 
 # Simulate data, first for the case where we observe with error ----------------------------------------------
 
