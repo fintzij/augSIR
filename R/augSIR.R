@@ -170,7 +170,7 @@ fwd <- function(Xother, W, irm, P.prev=NULL, distr=NULL, p, t0, t1){
     P.now<-outer(distr,emit,FUN="*")*tpm
     
     P.now <- normalize(P.now)
-    
+
     return(P.now)
 }
 
