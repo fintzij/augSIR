@@ -17,7 +17,7 @@ ggplot(dat.m,aes(x=time,y=value,colour=variable))+geom_point() + theme_bw()
 popsize <- 200 # size of the population; 
 tmax <- 20 # maximum time of observation
 
-niter <- 500 # number of iterations in the sampler
+niter <- 1000 # number of iterations in the sampler
 
 initdist <- c(0.995,0.005,0) # initial distribution for individual infection status
 
@@ -28,7 +28,7 @@ Alpha <- vector(length = niter+1); Alpha[1] <- 0
 probs <- vector(length = niter+1); #probs[1] <- 0.2 + runif(1, -0.1, 0.1)
 probs[1] <-1
 
-results <- vector("list",niter)
+results.noerr <- vector("list",niter)
 # # vectors for parameters of distributions for beta, mu, and p. beta and mu have gamma distributions, p has beta distribution.
 # beta.prior <- c(12, 1200)
 # mu.prior <- c(6, 12)
@@ -112,7 +112,7 @@ for(k in 1:(niter)){
 #     loglik[k] <- calc_loglike(X, W, Beta[k+1], Mu[k+1], Alpha[k+1], probs[k+1])  
     
     # store results
-    results[[k]] <- list(trajectories = X.cur, accepts = mean(accepts), prob = pop_prob(X.new, irm.new))    
+    results.noerr[[k]] <- list(trajectories = X.cur, accepts = mean(accepts), prob = pop_prob(X.new, irm.new))    
 }
 
 
@@ -162,7 +162,7 @@ Alpha <- vector(length = niter+1); Alpha[1] <- 0
 probs <- vector(length = niter+1); #probs[1] <- 0.2 + runif(1, -0.1, 0.1)
 probs[1] <- 0.2
  
-results2 <- vector("list",niter)
+results.2 <- vector("list",niter)
 # # vectors for parameters of distributions for beta, mu, and p. beta and mu have gamma distributions, p has beta distribution.
 # beta.prior <- c(12, 1200)
 # mu.prior <- c(6, 12)
@@ -247,7 +247,7 @@ for(k in 1:(niter)){
     #     loglik[k] <- calc_loglike(X, W, Beta[k+1], Mu[k+1], Alpha[k+1], probs[k+1])  
     
     # store results
-    results2[[k]] <- list(trajectories = X.cur, accepts = mean(accepts), prob = pop_prob(X.new, irm.new))    
+    results.2[[k]] <- list(trajectories = X.cur, accepts = mean(accepts), prob = pop_prob(X.new, irm.new))    
 }
 
 

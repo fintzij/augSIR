@@ -205,12 +205,6 @@ buildirm <- function(X, b, m, a, pop=FALSE){
     Xobs <- rbind(c(0,0,sum(X[X[,1]==0,3])), X[X[,1]!=0,]); times <- unique(Xobs[,1])
     numsusc <- popsize - cumsum(Xobs[,3]==1) - Xobs[1,3]; numinf <- cumsum(Xobs[,3]) #cumulative counts of the numbers of infecteds and recoverds at event times
     
-    #   check if the infection has died off. ensure that the number of infecteds is zero forever after.
-    if(any(numinf==0) & a==0){
-        lastinf <- which(numinf==0)[1]
-        numinf[lastinf:length(numinf)] <- 0
-    }
-    
     irm <- array(0, dim = c(3,3,dim(Xobs)[1]-1))
     if(pop==FALSE){
         irm[1,2,] <- b*numinf[1:(length(numinf)-1)] + a; irm[1,1,] <- -irm[1,2,]
@@ -233,8 +227,8 @@ buildtpm <- function(Q, t0, t1){
 # obstpm computes the product of transition probability matrices between observation times. takes an array of instantaneous rate matrices,
 # an augmented data matrix, two observation times as inputs 
 obstpm <- function(Xother, irm, t0, t1){
-    timeseq <- c(t0,Filter(function(X) X>t0 & X<t1, Xother[,1]), t1)
-    tpm <- diag(1,3); 
+    timeseq <- c(t0,Xother[which(Xother[,1]>t0 & Xother[,1]<t1), 1], t1)
+    tpm <- diag(1,3) 
     if(0 %in% unique(Xother[,1])){
         times <- unique(Xother[,1])
     } else times <- c(0, unique(Xother[,1]))
@@ -438,6 +432,23 @@ path_prob <- function(path, Xother, irm.other, initdist, tmax){
     
     return(path.prob)
 }
+
+# Functions to update parameters
+update_beta <- function(X.cur, beta.prior, popsize){
+    rgamma(1, shape = (beta.prior[1] + sum(X.cur[,3]==1)), 
+           rate = beta.prior[2] + sum((popsize - cumsum(X.cur[,3]==1))*(cumsum(X.cur[,3]==1) - cumsum(X.cur[,3]==-1))*c(0,X.cur[2:dim(X.cur)[1],1] - X.cur[1:(dim(X.cur)[1]-1),1])*(X.cur[,3]==1)))
+}
+
+update_mu <- function(X.cur, mu.prior){
+    rgamma(1, shape = mu.prior[1] + sum(X.cur[,3]==-1),
+           rate = mu.prior[2] + sum((cumsum(X.cur[,3]==1) - cumsum(X.cur[,3]==-1))*c(0,X.cur[2:dim(X.cur)[1],1] - X.cur[1:(dim(X.cur)[1]-1)])*(X.cur[,3]==-1)))
+}
+
+update_alpha <- function(X.cur, alpha.prior, popsize){
+    rgamma(1, shape = (alpha.prior[1] + sum(X.cur[,3]==1)),
+           rate = alpha.prior[2] + sum((popsize - cumsum(X.cur[,3]==1))*c(0,X.cur[2:dim(X.cur)[1],1] - X.cur[1:(dim(X.cur)[1]-1),1])*(X.cur[,3]==1)))
+}
+
 # checkpossible checks whether removing a subject to resimulate the epidemic would cause an impossible population trajectory. If so, M-H automatically rejects.
 
 checkpossible <- function(X, a=0, W=NULL){
@@ -521,12 +532,14 @@ augSIR <- function(dat, sim.settings, priors, inits) {
         }
     }
     
+    irm.cur <- buildirm(X.cur, b = Beta[1], m = Mu[1], a = Alpha[1]) 
+    pop_prob.cur <- pop_prob(X.cur, irm = irm.cur, initdist = initdist, popsize = popsize)
+    
     # M-H sampler
     for(k in 1:(niter-1)){
         # Update trajectories
         print(k)
         subjects <- sample(unique(X.cur[,2]),length(unique(X.cur[,2])),replace=TRUE)
-        irm.cur <- buildirm(X.cur, b = Beta[k], m = Mu[k], a = Alpha[k]) 
         
         for(j in 1:length(subjects)){
             Xother <- X.cur[X.cur[,2]!=subjects[j],]
@@ -542,13 +555,17 @@ augSIR <- function(dat, sim.settings, priors, inits) {
             X.new <- updateX(X.cur,path.new,subjects[j]); path.new <- getpath(X.new,subjects[j])
             irm.new <- buildirm(X.new, b = Beta[k], m = Mu[k], a = Alpha[k])
             
-            a.prob <- pop_prob(X.new, irm = irm.new, initdist = initdist, popsize = popsize) - pop_prob(X.cur, irm = irm.cur, initdist = initdist, popsize = popsize) + 
-                path_prob(path.cur, Xother, irm.other, initdist, tmax) - path_prob(path.new, Xother, irm.other, initdist, tmax)
+            pop_prob.new <- pop_prob(X.new, irm = irm.new, initdist = initdist, popsize = popsize)
+            path_prob.new <- path_prob(path.new, Xother, irm.other, initdist, tmax)
+            path_prob.cur <- path_prob(path.cur, Xother, irm.other, initdist, tmax)
+            
+            a.prob <- pop_prob.new - pop_prob.cur + path_prob.cur - path_prob.new
             
             if(min(a.prob, 0) > log(runif(1))) {
                 X.cur <- X.new
                 W.cur <- updateW(W.cur,X.cur)
                 irm.cur <- irm.new
+                pop_prob.cur <- pop_prob.new
             }
         }
         
@@ -557,14 +574,12 @@ augSIR <- function(dat, sim.settings, priors, inits) {
         probs[k+1] <- 1
         
         # draw new rate parameters 
-        Beta[k+1] <- rgamma(1, shape = (beta.prior[1] + sum(X.cur[,3]==1)), 
-                             rate = beta.prior[2] + sum((popsize - cumsum(X.cur[,3]==1))*(cumsum(X.cur[,3]==1) - cumsum(X.cur[,3]==-1))*c(0,X.cur[2:dim(X.cur)[1],1] - X.cur[1:(dim(X.cur)[1]-1),1])*(X.cur[,3]==1)))
-          
-        Mu[k+1] <- rgamma(1, shape = mu.prior[1] + sum(X.cur[,3]==-1),
-                          rate = mu.prior[2] + sum((cumsum(X.cur[,3]==1) - cumsum(X.cur[,3]==-1))*c(0,X.cur[2:dim(X.cur)[1],1] - X.cur[1:(dim(X.cur)[1]-1)])*(X.cur[,3]==-1)))
+        Beta[k+1] <- update_beta(X.cur = X.cur, beta.prior = beta.prior, popsize = popsize)
         
-        #   Alpha[k+1] <- rgamma(1, shape = (alpha.prior[1] + sum(X.cur[,3]==1)),
-        #                        rate = alpha.prior[2] + sum((popsize - cumsum(X.cur[,3]==1))*c(0,X.cur[2:dim(X.cur)[1],1] - X.cur[1:(dim(X.cur)[1]-1),1])*(X.cur[,3]==1)))
+        Mu[k+1] <- update_mu(X.cur = X.cur, mu.prior = mu.prior)
+        
+        #   Alpha[k+1] <- update_alpha(X.cur = X.cur, alpha.prior = alpha.prior, popsize = popsize)
+        
         Alpha[k+1] <- 0
         
         loglik[k] <- calc_loglike(X = X.cur, W = W.cur, b = Beta[k+1], m = Mu[k+1], a = Alpha[k+1], p = probs[k+1], initdist = initdist, popsize = popsize)  

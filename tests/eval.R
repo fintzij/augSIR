@@ -16,8 +16,8 @@ ggplot(dat.m,aes(x=time,y=value,colour=variable))+geom_point() + theme_bw()
 
 sim.settings <- list(popsize = 200,
                      tmax = 20,
-                     niter = 500,
-                     amplify = 2,
+                     niter = 2000,
+                     amplify = 2000,
                      initdist = c(0.995, 0.005, 0))
 
 inits <- list(beta.init = 0.01 + runif(1,-0.005, 0.005),
@@ -33,6 +33,7 @@ priors <- list(beta.prior = c(6e-4, 0.05),
 # run sampler
 
 results <- augSIR(dat, sim.settings, priors, inits)
+# results.prof <- lineprof(augSIR(dat, sim.settings, priors, inits))
 
 
 # Plots -------------------------------------------------------------------
