@@ -201,6 +201,7 @@ normalize <- function(X){
 
 # buildirm constructs the instantaneous rate matrices for use in the forward backward algorith
 buildirm <- function(X, b, m, a, pop=FALSE){
+    popsize <- length(unique(X[,2]))
     Xobs <- rbind(c(0,0,sum(X[X[,1]==0,3])), X[X[,1]!=0,]); times <- unique(Xobs[,1])
     numsusc <- popsize - cumsum(Xobs[,3]==1) - Xobs[1,3]; numinf <- cumsum(Xobs[,3]) #cumulative counts of the numbers of infecteds and recoverds at event times
     
@@ -259,7 +260,7 @@ numinfected <- function(X){
 # controls the factor by which the observed number of infecteds is multiplied to get the number of initialized trajectories (up to the population size)
 # X is matrix with event times, subject id and event codes. 
 # Event codes: 1=carriage aquired, -1=carriage infected, 0=event out of time range
-initializeX <- function(W, mu, p, amplify, tmax){
+initializeX <- function(W, mu, p, amplify, tmax, popsize){
     whichsick <- sample(1:popsize,min(popsize,floor(sum(W[,2])/(amplify*p))))
     
     X <- as.matrix(data.frame(time=rep(0,popsize*2), id=rep(1:popsize,each=2), event=rep(0,2*popsize)))
@@ -365,22 +366,22 @@ getpath <- function(X.cur, j) {
 
 # Other functions ---------------------------------------------------------
 
-calc_loglike <- function(X, W, b, m, a=0, p){
+calc_loglike <- function(X, W, b, m, a=0, p, initdist, popsize){
 #     popsize = length(unique(X[,2])); times <- unique(X[,1]); timediffs <- times[2:length(times)] - times[1:(length(times)-1)]
     Xobs <- rbind(c(0,0,sum(X[X[,1]==0,3])), X[X[,1]!=0,]); irm <- buildirm(X, b, m, a, pop=TRUE)
-    
+    initinfec <- sum(X[X[,1]==0, 3])
     events <- ifelse(Xobs[Xobs[,1]!=0,3]==1, 1,2); rates <- ifelse(events==1,irm[1,2,], irm[2,3,])
     
-    dbinom(sum(W[,2]), sum(W[,3]), prob=p, log=TRUE) + sum(log(rates)) - sum(rates*(Xobs[2:dim(Xobs)[1],1] - Xobs[1:(dim(Xobs)[1]-1),1]))
+    dbinom(sum(W[,2]), sum(W[,3]), prob=p, log=TRUE) + dmultinom(c(popsize - initinfec, initinfec, 0), prob = initdist, log=TRUE) + sum(log(rates)) - sum(rates*(Xobs[2:dim(Xobs)[1],1] - Xobs[1:(dim(Xobs)[1]-1),1]))
 } 
 
 # pop_prob and path_prob calculate the log-probabilities of the population trajectory and the subject trajectory for use in the M-H ratio
 
-pop_prob <- function(X, irm, initdist){
-    Xobs <- rbind(c(0,0,sum(X[X[,1]==0,3])), X[X[,1]!=0,])
+pop_prob <- function(X, irm, initdist, popsize){
+    Xobs <- rbind(c(0,0,sum(X[X[,1]==0,3])), X[X[,1]!=0,]); initinfec <- sum(X[X[,1]==0, 3])
     events <- ifelse(Xobs[Xobs[,1]!=0,3]==1, 1,2); rates <- ifelse(events==1,irm[1,2,], irm[2,3,])
     
-    sum(log(rates)) - sum(rates*(Xobs[2:dim(Xobs)[1],1] - Xobs[1:(dim(Xobs)[1]-1),1]))
+    dmultinom(c(popsize - initinfec, initinfec, 0), prob = initdist, log=TRUE) + sum(log(rates)) - sum(rates*(Xobs[2:dim(Xobs)[1],1] - Xobs[1:(dim(Xobs)[1]-1),1]))
 }
 
 path_prob <- function(path, Xother, irm.other, initdist, tmax){
@@ -460,6 +461,18 @@ checkpossible <- function(X, a=0, W=NULL){
     return(is.possible)
 }
 
+# find.pprior finds the parameters for the beta prior for the binomial sampling probability
+find.pprior <- function(mu, sigmasq, inits){
+    require(rootSolve)
+    
+    prior <- function(x) {
+        c(F1 = x[1]/(x[1] + x[2]) - mu,
+          F2 = x[1]*x[2] / (x[1] + x[2])^2 / (x[1]+ x[2] + 1) - sigmasq)
+    }
+    
+    ss <- multiroot(f = prior, start = c(inits[1],inits[2]))
+    return(ss)
+}
 
 # augSIR wrapper ----------------------------------------------------------
 
@@ -469,13 +482,14 @@ augSIR <- function(dat, sim.settings, priors, inits) {
     # initialize simulation settings
     popsize <- sim.settings$popsize # size of the population; 
     tmax <- sim.settings$tmax # maximum time of observation
+    amplify <- sim.settings$amplify # amplification parameter for initialization
     niter <- sim.settings$niter # number of iterations in the sampler
     initdist <- sim.settings$initdist # initial distribution for individual infection status
     
     # vectors for parameters
     Beta <- vector(length=niter); Beta[1] <- inits$beta.init
     Mu <- vector(length = niter); Mu[1] <- inits$mu.init
-    Alpha <- vector(length = niter); Alpha[1] <- inits$alpha$init 
+    Alpha <- vector(length = niter); Alpha[1] <- inits$alpha.init 
     probs <- vector(length = niter); probs[1] <- inits$probs.init
     
     # vectors for parameters of distributions for beta, mu, and p. beta and mu have gamma distributions, p has beta distribution.
@@ -495,14 +509,14 @@ augSIR <- function(dat, sim.settings, priors, inits) {
     # Event codes: 1=carriage aquired, -1=carriage infected, 0=event out of time range
     X.cur <- as.matrix(data.frame(time=rep(0,popsize*2), id=rep(1:popsize,each=2), event=rep(0,2*popsize)))
     
-    X.cur <- initializeX(W.cur, Mu[1], probs[1], 1, tmax=20)
+    X.cur <- initializeX(W = W.cur, mu = Mu[1], p=probs[1], amplify = amplify, tmax=20, popsize = popsize)
     
     # update observation matrix
     W.cur <- updateW(W.cur,X.cur)
     
     if(!checkpossible(X=X.cur, W=W.cur)) {
         while(!checkpossible(X=X.cur,W=W.cur)){
-            X.cur <- initializeX(W.cur, Mu[1], probs[1], 1, tmax=20)
+            X.cur <- initializeX(W = W.cur, mu = Mu[1], p=probs[1], amplify = amplify, tmax=20, popsize = popsize)
             W.cur <- updateW(W.cur,X.cur)
         }
     }
@@ -510,7 +524,7 @@ augSIR <- function(dat, sim.settings, priors, inits) {
     # M-H sampler
     for(k in 1:(niter-1)){
         # Update trajectories
-        
+        print(k)
         subjects <- sample(unique(X.cur[,2]),length(unique(X.cur[,2])),replace=TRUE)
         irm.cur <- buildirm(X.cur, b = Beta[k], m = Mu[k], a = Alpha[k]) 
         
@@ -528,7 +542,7 @@ augSIR <- function(dat, sim.settings, priors, inits) {
             X.new <- updateX(X.cur,path.new,subjects[j]); path.new <- getpath(X.new,subjects[j])
             irm.new <- buildirm(X.new, b = Beta[k], m = Mu[k], a = Alpha[k])
             
-            a.prob <- pop_prob(X.new, irm = irm.new) - pop_prob(X.cur, irm = irm.cur) + 
+            a.prob <- pop_prob(X.new, irm = irm.new, initdist = initdist, popsize = popsize) - pop_prob(X.cur, irm = irm.cur, initdist = initdist, popsize = popsize) + 
                 path_prob(path.cur, Xother, irm.other, initdist, tmax) - path_prob(path.new, Xother, irm.other, initdist, tmax)
             
             if(min(a.prob, 0) > log(runif(1))) {
@@ -538,25 +552,22 @@ augSIR <- function(dat, sim.settings, priors, inits) {
             }
         }
         
-        # Update observation matrix
-        W <- updateW(W, X)
-        
         # draw new binomial sampling probability parameter
         #   probs[k+1] <- rbeta(1,p.prior[1] + sum(W[,2]), p.prior[2] + sum(W[,3]-W[,2]))
         probs[k+1] <- 1
         
         # draw new rate parameters 
-        Beta[k+1] <- rgamma(1, shape = (beta.prior[1] + sum(X[,3]==1)), 
-                             rate = beta.prior[2] + sum((popsize - cumsum(X[,3]==1))*(cumsum(X[,3]==1) - cumsum(X[,3]==-1))*c(0,X[2:dim(X)[1],1] - X[1:(dim(X)[1]-1),1])*(X[,3]==1)))
+        Beta[k+1] <- rgamma(1, shape = (beta.prior[1] + sum(X.cur[,3]==1)), 
+                             rate = beta.prior[2] + sum((popsize - cumsum(X.cur[,3]==1))*(cumsum(X.cur[,3]==1) - cumsum(X.cur[,3]==-1))*c(0,X.cur[2:dim(X.cur)[1],1] - X.cur[1:(dim(X.cur)[1]-1),1])*(X.cur[,3]==1)))
           
-        Mu[k+1] <- rgamma(1, shape = mu.prior[1] + sum(X[,3]==-1),
-                          rate = mu.prior[2] + sum((cumsum(X[,3]==1) - cumsum(X[,3]==-1))*c(0,X[2:dim(X)[1],1] - X[1:(dim(X)[1]-1)])*(X[,3]==-1)))
+        Mu[k+1] <- rgamma(1, shape = mu.prior[1] + sum(X.cur[,3]==-1),
+                          rate = mu.prior[2] + sum((cumsum(X.cur[,3]==1) - cumsum(X.cur[,3]==-1))*c(0,X.cur[2:dim(X.cur)[1],1] - X.cur[1:(dim(X.cur)[1]-1)])*(X.cur[,3]==-1)))
         
-        #   Alpha[k+1] <- rgamma(1, shape = (alpha.prior[1] + sum(X[,3]==1)),
-        #                        rate = alpha.prior[2] + sum((popsize - cumsum(X[,3]==1))*c(0,X[2:dim(X)[1],1] - X[1:(dim(X)[1]-1),1])*(X[,3]==1)))
+        #   Alpha[k+1] <- rgamma(1, shape = (alpha.prior[1] + sum(X.cur[,3]==1)),
+        #                        rate = alpha.prior[2] + sum((popsize - cumsum(X.cur[,3]==1))*c(0,X.cur[2:dim(X.cur)[1],1] - X.cur[1:(dim(X.cur)[1]-1),1])*(X.cur[,3]==1)))
         Alpha[k+1] <- 0
         
-        loglik[k] <- calc_loglike(X, W, Beta[k+1], Mu[k+1], Alpha[k+1], probs[k+1])  
+        loglik[k] <- calc_loglike(X = X.cur, W = W.cur, b = Beta[k+1], m = Mu[k+1], a = Alpha[k+1], p = probs[k+1], initdist = initdist, popsize = popsize)  
         
         #   trajectories <- data.frame(X); epidemic <- data.frame(W)
         #   trajectories$id <- factor(trajectories$id, levels = unique(as.factor(trajectories$id)))
