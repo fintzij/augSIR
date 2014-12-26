@@ -46,17 +46,20 @@ if(W.cur[1,2]==0) W.cur[1,2]<-1
 # Event codes: 1=carriage aquired, -1=carriage infected, 0=event out of time range
 X.cur <- as.matrix(data.frame(time=rep(0,popsize*2), id=rep(1:popsize,each=2), event=rep(0,2*popsize)))
 
-X.cur <- initializeX(W.cur, Mu[1], probs[1], 1, tmax=20)
+X.cur <- initializeX(W.cur, Mu[1], probs[1], 1, tmax=20, popsize = popsize)
 
 # update observation matrix
 W.cur <- updateW(W.cur,X.cur)
 
 if(!checkpossible(X=X.cur, W=W.cur)) {
     while(!checkpossible(X=X.cur,W=W.cur)){
-        X.cur <- initializeX(W.cur, Mu[1], probs[1], 1, tmax=20)
+        X.cur <- initializeX(W.cur, Mu[1], probs[1], 1, tmax=20, popsize = popsize)
         W.cur <- updateW(W.cur,X.cur)
     }
 }
+
+irm.cur <- buildirm(X.cur, b = Beta[1], m = Mu[1], a = Alpha[1]) 
+pop_prob.cur <- pop_prob(X.cur, irm = irm.cur, initdist = initdist, popsize = popsize)
 
 # M-H sampler
 for(k in 1:(niter)){
@@ -64,12 +67,10 @@ for(k in 1:(niter)){
     # Update trajectories
     
     subjects <- sample(unique(X.cur[,2]),length(unique(X.cur[,2])),replace=TRUE)
-    irm.cur <- buildirm(X.cur, b = Beta[k], m = Mu[k], a = Alpha[k]) 
-    accepts <- rep(0,length(subjects))
     
     for(j in 1:length(subjects)){
-#         print(j)
         Xother <- X.cur[X.cur[,2]!=subjects[j],]
+        
         path.cur <- getpath(X.cur, subjects[j])
         
         W.other <-updateW(W.cur, Xother)
@@ -81,14 +82,17 @@ for(k in 1:(niter)){
         X.new <- updateX(X.cur,path.new,subjects[j]); path.new <- getpath(X.new,subjects[j])
         irm.new <- buildirm(X.new, b = Beta[k], m = Mu[k], a = Alpha[k])
         
-        a.prob <- pop_prob(X.new, irm = irm.new) - pop_prob(X.cur, irm = irm.cur) + 
-            path_prob(path.cur, Xother, irm.other, initdist, tmax) - path_prob(path.new, Xother, irm.other, initdist, tmax)
+        pop_prob.new <- pop_prob(X.new, irm = irm.new, initdist = initdist, popsize = popsize)
+        path_prob.new <- path_prob(path.new, Xother, irm.other, initdist, tmax)
+        path_prob.cur <- path_prob(path.cur, Xother, irm.other, initdist, tmax)
+        
+        a.prob <- pop_prob.new - pop_prob.cur + path_prob.cur - path_prob.new
         
         if(min(a.prob, 0) > log(runif(1))) {
             X.cur <- X.new
             W.cur <- updateW(W.cur,X.cur)
             irm.cur <- irm.new
-            accepts[j] <- 1
+            pop_prob.cur <- pop_prob.new
         }
     }
     
@@ -112,7 +116,7 @@ for(k in 1:(niter)){
 #     loglik[k] <- calc_loglike(X, W, Beta[k+1], Mu[k+1], Alpha[k+1], probs[k+1])  
     
     # store results
-    results.noerr[[k]] <- list(trajectories = X.cur, accepts = mean(accepts), prob = pop_prob(X.new, irm.new))    
+    results.noerr[[k]] <- list(trajectories = X.cur, prob = pop_prob(X.new, irm.new))    
 }
 
 

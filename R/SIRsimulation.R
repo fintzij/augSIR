@@ -114,3 +114,80 @@ SIRsim2 <- function(popsize, S0, I0, b, mu, a=0, tmax, censusInterval, prob, ret
         return(list(results = SIRres, trajectory = X))
     }
 }
+
+SIRsim3 <- function(popsize, S0, I0, b, mu, a=0, tmax, censusInterval, prob, returnX = FALSE) {
+    X <- as.matrix(data.frame(time=rep(0,popsize*2), id=rep(1:popsize,each=2), event=rep(0,2*popsize), observed = rep(0,2*popsize)))
+    
+    for(k in seq(1,(2*I0 - 1),by=2)){
+        X[k, 3] <- 1 #record an infection, infection time for these cases is zero
+        
+    }
+    
+    X <- X[order(X[,1],X[,3]),]
+    
+    h1t <- h1(a,b,S0,I0) 
+    h2t <- h2(mu,I0)
+    
+    keep.going <- TRUE; timenow <- 0
+    which.susc <- (I0 + 1):popsize; which.inf <- 1:I0
+    infectednow <- I0; susceptiblenow <- S0
+    
+    while(keep.going == TRUE){
+        if(infectednow == 0 | susceptiblenow==0) break
+        rate <- h1t + h2t
+        tau <- rexp(1, rate=rate)
+        
+        p <- runif(1); probs <- cumsum(c(h1t, h2t)/rate)
+        
+        if (p <= probs[1]) { #infection happens
+            timenow <- timenow + tau; infectednow <- infectednow + 1; susceptiblenow <- susceptiblenow - 1
+            X[which(X[,2] == which.susc[1])[1],1] <- ifelse(timenow <= tmax, timenow, 0)
+            X[which(X[,2] == which.susc[1])[1],3] <- ifelse(timenow <= tmax, 1, 0)
+            
+            h1t <- h1(a, b, susceptiblenow, infectednow); h2t <- h2(mu, infectednow)
+            which.inf <- c(which.inf, which.susc[1]); which.susc <- which.susc[-1]; 
+            X <- X[order(X[,1],X[,3]),]
+            
+        } else if(p>probs[1]){ # recovery happens
+            timenow <- timenow + tau; infectednow <- infectednow - 1; susceptiblenow <- susceptiblenow
+            durations <- timenow - X[X[,3]!=0 & X[,2] %in% which.inf, 1]; durations <- cumsum(durations)/sum(durations)
+            
+            draw <- runif(1)
+            
+            whorecovers <- Position(function(x) x >= draw, durations)
+            
+            X[which(X[,2] == which.inf[whorecovers])[1],1] <- ifelse(timenow <= tmax, timenow, 0)
+            X[which(X[,2] == which.inf[whorecovers])[1],3] <- ifelse(timenow <= tmax, -1, 0)
+            
+            h1t <- h1(a, b, susceptiblenow, infectednow); h2t <- h2(mu, infectednow)
+            which.inf <- which.inf[-whorecovers]
+            X <- X[order(X[,1],X[,3]),]
+        }
+        
+        if(timenow > tmax | (infectednow == 0 & susceptiblenow == 0)) keep.going <- FALSE
+    }
+    
+    wasinfected <- unique(X[which(X[,3]==1),2]); observed <- ifelse(runif(length(wasinfected))<= prob, 1, 0)
+    for(j in 1:length(wasinfected)){
+        X[which(X[,2]==wasinfected[j]),4] <- observed[j]
+    }
+    
+    SIRres <- data.frame(time = seq(0, tmax, by = censusInterval),
+                         Observed = 0,
+                         Truth = 0)
+    for(k in 1:dim(SIRres)[1]){
+        SIRres$Observed[k] <- sum(X[which(X[,1] <= SIRres$time[k] & X[,4]==1),3])
+        SIRres$Truth[k] <- sum(X[which(X[,1] <= SIRres$time[k]),3])
+        
+    }
+    
+    if(any(SIRres[,2]==0 & SIRres[,3]==0)){
+        SIRres <- SIRres[1:(min(which(SIRres[,2]==0 & SIRres[,3]==0))),]
+    }
+    
+    if(returnX == FALSE){
+        return(SIRres)
+    } else {
+        return(list(results = SIRres, trajectory = X))
+    }
+}
