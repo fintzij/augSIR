@@ -4,15 +4,22 @@
 
 # Simulate data -----------------------------------------------------------
 
-SIRres<-SIRsim(N = 200, S0 = 199, I0 = 1, b = 0.01, mu=.5, a=0, maxtime = 20,censusInterval=1);
-SIRres = cbind(SIRres,200 - rowSums(SIRres[,2:3]))
-colnames(SIRres)<-c("time","susceptible","infected","recovered")
+# SIRres<-SIRsim(N = 200, S0 = 199, I0 = 1, b = 0.01, mu=.5, a=0, maxtime = 20,censusInterval=1, prob=0.2)
+# SIRres = cbind(SIRres,200 - rowSums(SIRres[,2:3]))
+# colnames(SIRres)<-c("time","susceptible","infected","recovered")
+# 
+# # get data 
+# dat <- data.frame(SIRres); dat$infected<-rbinom(n=dim(dat)[1], size=dat$infected)
+# dat.m <- melt(dat,id.vars="time")
+
+SIRres<-SIRsim2(popsize = 200, S0 = 199, I0 = 1, b = 0.002, mu=.5, a=0, tmax = 15,censusInterval=0.01, prob=0.2)
+colnames(SIRres)<-c("time","Observed","Truth")
 
 # get data 
-dat <- data.frame(SIRres); dat$infected<-rbinom(n=dim(dat)[1], size=dat$infected, prob=0.2)
-dat.m <- melt(dat,id.vars="time")
+dat <- data.frame(SIRres); dat$Binomial.Count<-rbinom(n=dim(dat)[1], size=dat$Truth, prob = 0.2)
+dat.m <- melt(dat,id.vars="time"); dat.m$variable <- factor(dat.m$variable, levels = c("Truth", "Observed", "Binomial.Count"))
 
-ggplot(dat.m,aes(x=time,y=value,colour=variable))+geom_point() + theme_bw()
+ggplot(dat.m,aes(x=time,y=value,colour=variable))+geom_line() + theme_bw()
 
 sim.settings <- list(popsize = 200,
                      tmax = 20,

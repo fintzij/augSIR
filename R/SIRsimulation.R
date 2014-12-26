@@ -55,3 +55,62 @@ SIRsim <- function(N, S0, I0, b, mu, a=0, g=0, maxtime, censusInterval){
 }
 
 
+SIRsim2 <- function(popsize, S0, I0, b, mu, a=0, tmax, censusInterval, prob, returnX = FALSE){
+    X <- as.matrix(data.frame(time=rep(0,popsize*2), id=rep(1:popsize,each=2), event=rep(0,2*popsize), observed = rep(0,2*popsize)))
+    
+    for(k in seq(1,(2*I0 - 1),by=2)){
+        X[k, 3] <- 1 #record an infection
+        X[k+1, 1] <- rexp(1, rate=mu) ; X[k+1, 3] <- -1  # record a recovery and the recovery time
+        X[k, 4] <- X[k+1, 4] <- ifelse(runif(1) <= prob, 1, 0) #record whether the infection and recovery were observed
+        
+    }
+    
+    X <- X[order(X[,1],X[,3]),]
+    timenow <- 0 ; susceptiblenow <- S0; infectednow <- I0; whichsusc <- (I0 + 1):popsize
+    
+    k <- I0 + 1; keep.going <- TRUE
+    while(keep.going==TRUE){
+        timeseq <- unique(X[,1]); irm <- buildirm(X, b, mu, a, pop=TRUE)
+        
+        for(j in 1:(length(timeseq)-1)){
+            eventtime <- timeseq[j] - log(1-runif(1))/irm[1,2,j]
+            if(eventtime < timeseq[j+1]) break
+        }
+        
+        if (eventtime>timeseq[length(timeseq)] | eventtime > tmax) {
+            eventtime <- Inf
+            keep.going <- FALSE # this condition would indicate that the epidemic has died off
+            break
+        } else if(eventtime <= timeseq[length(timeseq)]){
+            X[which(X[,2]==k)[1],c(1,3)] <- c(eventtime, 1) # record infection time and event code
+            X[which(X[,2]==k)[2],c(1,3)] <- c(eventtime - log(1-runif(1))/irm[2,3,1], -1) # record recovery time and event code
+            X[which(X[,2]==k), 4] <- ifelse(runif(1) <= prob, 1, 0) # record whether infection was observed
+            
+            X <- X[order(X[,1],X[,3]),]
+            k <- k+1
+            
+            if(k > popsize){
+                keep.going <- FALSE  
+            } 
+        }
+    }
+        
+    SIRres <- data.frame(time = seq(0, tmax, by = censusInterval),
+                         infec.obs = 0,
+                         infec.true = 0)
+    for(k in 1:dim(SIRres)[1]){
+        SIRres$infec.obs[k] <- sum(X[which(X[,1] <= SIRres$time[k] & X[,4]==1),3])
+        SIRres$infec.true[k] <- sum(X[which(X[,1] <= SIRres$time[k]),3])
+        
+    }
+    
+    if(any(SIRres[,2]==0 & SIRres[,3]==0)){
+        SIRres <- SIRres[1:(min(which(SIRres[,2]==0 & SIRres[,3]==0))),]
+    }
+    
+    if(returnX == FALSE){
+        return(SIRres)
+    } else {
+        return(list(results = SIRres, trajectory = X))
+    }
+}

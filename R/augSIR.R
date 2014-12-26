@@ -202,8 +202,8 @@ normalize <- function(X){
 # buildirm constructs the instantaneous rate matrices for use in the forward backward algorith
 buildirm <- function(X, b, m, a, pop=FALSE){
     popsize <- length(unique(X[,2]))
-    Xobs <- rbind(c(0,0,sum(X[X[,1]==0,3])), X[X[,1]!=0,]); times <- unique(Xobs[,1])
-    numsusc <- popsize - cumsum(Xobs[,3]==1) - Xobs[1,3]; numinf <- cumsum(Xobs[,3]) #cumulative counts of the numbers of infecteds and recoverds at event times
+    Xobs <- rbind(c(0,0,sum(X[X[,1]==0,3])), X[X[,1]!=0,c(1:3)]); times <- unique(Xobs[,1])
+    numsusc <- popsize - cumsum(Xobs[,3]==1); numinf <- cumsum(Xobs[,3]) #cumulative counts of the numbers of infecteds and recoverds at event times
     
     irm <- array(0, dim = c(3,3,dim(Xobs)[1]-1))
     if(pop==FALSE){
