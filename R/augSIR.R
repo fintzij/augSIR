@@ -220,7 +220,7 @@ buildirm <- function(X, b, m, a, pop=FALSE){
 
 # buildtpm constructs a transition probability matrix using the matrix exponential
 buildtpm <- function(Q, t0, t1){
-    Qeig <- eigen(Q)
+    Qeig <- eigen(Q, symmetric = FALSE)
     Qeig$vectors%*%diag(exp(Qeig$values*(t1-t0)))%*%solve(Qeig$vectors)
 }
 
@@ -514,7 +514,6 @@ augSIR <- function(dat, sim.settings, priors, inits) {
     
     # observation matrix
     W.cur <- as.matrix(data.frame(time = dat$time, sampled = dat$infected, augmented = 0)); 
-    if(W.cur[1,2]==0) W.cur[1,2]<-1
     
     # matrix with event times, subject id and event codes. 
     # Event codes: 1=carriage aquired, -1=carriage infected, 0=event out of time range
@@ -570,8 +569,7 @@ augSIR <- function(dat, sim.settings, priors, inits) {
         }
         
         # draw new binomial sampling probability parameter
-        #   probs[k+1] <- rbeta(1,p.prior[1] + sum(W[,2]), p.prior[2] + sum(W[,3]-W[,2]))
-        probs[k+1] <- 1
+        probs[k+1] <- rbeta(1,p.prior[1] + sum(W.cur[,2]), p.prior[2] + sum(W.cur[,3]-W.cur[,2]))
         
         # draw new rate parameters 
         Beta[k+1] <- update_beta(X.cur = X.cur, beta.prior = beta.prior, popsize = popsize)

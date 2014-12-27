@@ -4,7 +4,7 @@
 
 # Simulate data -----------------------------------------------------------
 
-SIRres<-SIRsim(N = 200, S0 = 199, I0 = 1, b = 0.01, mu=.5, a=0, maxtime = 20,censusInterval=.1)
+SIRres<-SIRsim(N = 200, S0 = 199, I0 = 1, b = 0.01, mu=.5, a=0, maxtime = 20,censusInterval=.01)
 SIRres = cbind(SIRres,200 - rowSums(SIRres[,2:3]))
 colnames(SIRres)<-c("time","susceptible","infected","recovered")
 
@@ -20,7 +20,7 @@ SIRres<-SIRsim3(popsize = 200, S0 = 199, I0 = 1, b = 0.01, mu=.5, a=0, tmax = 20
 dat <- data.frame(SIRres); dat$Binomial.Count<-rbinom(n=dim(dat)[1], size=dat$Truth, prob = 0.2)
 dat.m <- melt(dat,id.vars="time"); dat.m$variable <- factor(dat.m$variable, levels = c("Truth", "Observed", "Binomial.Count"))
 
-ggplot(dat.m,aes(x=time,y=value,colour=variable))+geom_point() + theme_bw()
+ggplot(dat.m,aes(x=time,y=value,colour=variable))+geom_line() + theme_bw()
 
 # check sampling method - binomial vs. individual
 
@@ -59,8 +59,8 @@ ggplot(dat.m, aes(x=time, y=value, colour=variable)) + geom_point() + theme_bw()
 
 sim.settings <- list(popsize = 200,
                      tmax = 20,
-                     niter = 2,
-                     amplify = 2000,
+                     niter = 2000,
+                     amplify = 2,
                      initdist = c(0.995, 0.005, 0))
 
 inits <- list(beta.init = 0.01 + runif(1,-0.005, 0.005),
@@ -74,12 +74,16 @@ priors <- list(beta.prior = c(6e-4, 0.05),
                p.prior = c(0.022, 0.084))
 
 # run sampler
+
+results <- augSIR(dat, sim.settings, priors, inits)
+
+#profile
 Rprof("~/School/UW/Year 3 +/Dissertation/Code/augSIR/tests/profile/augSIRprofile.out")
 results <- augSIR(dat, sim.settings, priors, inits)
 Rprof()
 summaryRprof("~/School/UW/Year 3 +/Dissertation/Code/augSIR/tests/profile/augSIRprofile.out")
 # results.prof <- lineprof(augSIR(dat, sim.settings, priors, inits))
-
+plotProfileCallGraph(readProfileData("~/School/UW/Year 3 +/Dissertation/Code/augSIR/tests/profile/augSIRprofile.out"),score = "total")
 
 # Plots -------------------------------------------------------------------
 
