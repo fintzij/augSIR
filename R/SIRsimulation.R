@@ -10,7 +10,7 @@ h2 <- function(mu, It){
 
 # SIRsim <- function(N, S0, I0, b, mu, a=0, g=0, maxtime, censusInterval){
 
-SIRsim <- function(popsize, S0, I0, b, mu, a=0, tmax, censusInterval, prob, binomsamp = TRUE, returnX = FALSE) {
+SIRsim <- function(popsize, S0, I0, b, mu, a=0, tmax, censusInterval, sampprob, binomsamp = TRUE, returnX = FALSE) {
     
     if(binomsamp == FALSE) {
         X <- as.matrix(data.frame(time=rep(0,popsize*2), id=rep(1:popsize,each=2), event=rep(0,2*popsize), observed = rep(0,2*popsize)))
@@ -37,7 +37,7 @@ SIRsim <- function(popsize, S0, I0, b, mu, a=0, tmax, censusInterval, prob, bino
         rate <- h1t + h2t
         tau <- rexp(1, rate=rate)
         
-        p <- runif(1); probs <- cumsum(c(h1t, h2t)/rate)
+        p <- runif(1); probs <- cumsum(c(h1t, h2t))/rate
         
         if (p <= probs[1]) { #infection happens
             timenow <- timenow + tau; infectednow <- infectednow + 1; susceptiblenow <- susceptiblenow - 1
@@ -66,11 +66,11 @@ SIRsim <- function(popsize, S0, I0, b, mu, a=0, tmax, censusInterval, prob, bino
             X <- X[order(X[,1],X[,3]),]
         }
         
-        if(timenow > tmax | (infectednow == 0 & susceptiblenow == 0)) keep.going <- FALSE
+        if(timenow > tmax | infectednow == 0) keep.going <- FALSE
     }
     
     if(binomsamp == FALSE){
-        wasinfected <- unique(X[which(X[,3]==1),2]); observed <- ifelse(runif(length(wasinfected))<= prob, 1, 0)
+        wasinfected <- unique(X[which(X[,3]==1),2]); observed <- ifelse(runif(length(wasinfected))<= sampprob, 1, 0)
         for(j in 1:length(wasinfected)){
             X[which(X[,2]==wasinfected[j]),4] <- observed[j]
         }
@@ -90,7 +90,7 @@ SIRsim <- function(popsize, S0, I0, b, mu, a=0, tmax, censusInterval, prob, bino
                              Observed = 0, 
                              Truth = 0)
         for(k in 1:dim(SIRres)[1]){
-            SIRres$Observed[k] <- rbinom(n = 1, size = sum(X[which(X[,1] <= SIRres$time[k]),3]), prob = prob)
+            SIRres$Observed[k] <- rbinom(n = 1, size = sum(X[which(X[,1] <= SIRres$time[k]),3]), prob = sampprob)
             SIRres$Truth[k] <- sum(X[which(X[,1] <= SIRres$time[k]),3])
             
         }

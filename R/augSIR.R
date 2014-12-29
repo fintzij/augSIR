@@ -435,13 +435,26 @@ path_prob <- function(path, Xother, irm.other, initdist, tmax){
 
 # Functions to update parameters
 update_beta <- function(X.cur, beta.prior, popsize){
-    rgamma(1, shape = (beta.prior[1] + sum(X.cur[,3]==1)), 
-           rate = beta.prior[2] + sum((popsize - cumsum(X.cur[,3]==1))*(cumsum(X.cur[,3]==1) - cumsum(X.cur[,3]==-1))*c(0,X.cur[2:dim(X.cur)[1],1] - X.cur[1:(dim(X.cur)[1]-1),1])*(X.cur[,3]==1)))
+    X <- X.cur[X.cur[,1]!=0,]
+    
+    init.infec <- sum(X.cur[,1] == 0 & X.cur[,3]==1); infections <- X[,3] == 1; 
+    numsick <- c(init.infec, init.infec + cumsum(X[,3])); numsusc <- popsize - cumsum(c(init.infec,X[,3]==1)) 
+    timediffs <- diff(c(0,X[,1]), lag = 1)
+    
+    rgamma(1, shape = (beta.prior[1] + sum(infections)), 
+           rate = beta.prior[2] + sum(numsick[1:(length(numsick)-1)] * numsusc[1:(length(numsusc) - 1)] * timediffs * infections))
 }
 
-update_mu <- function(X.cur, mu.prior){
-    rgamma(1, shape = mu.prior[1] + sum(X.cur[,3]==-1),
-           rate = mu.prior[2] + sum((cumsum(X.cur[,3]==1) - cumsum(X.cur[,3]==-1))*c(0,X.cur[2:dim(X.cur)[1],1] - X.cur[1:(dim(X.cur)[1]-1)])*(X.cur[,3]==-1)))
+update_mu <- function(X.cur, mu.prior, popsize){
+    X <- X.cur[X.cur[,1]!=0,]
+    
+    init.infec <- sum(X.cur[,1] == 0 & X.cur[,3]==1); recoveries <- X[,3] == -1
+    numsick <- c(init.infec, init.infec + cumsum(X[,3]))
+    timediffs <- diff(c(0,X[,1]), lag = 1)
+    
+    rgamma(1, shape = (mu.prior[1] + sum(recoveries)), 
+           rate = mu.prior[2] + sum(numsick[1:(length(numsick)-1)] * timediffs * recoveries))
+    
 }
 
 update_alpha <- function(X.cur, alpha.prior, popsize){
@@ -485,6 +498,17 @@ find.pprior <- function(mu, sigmasq, inits){
     return(ss)
 }
 
+find.rateprior <- function(mu, sigmasq, inits){
+    require(rootSolve)
+    
+    prior <- function(x){
+        c(F1 = x[1]/x[2] - mu,
+          F2 = x[1]/x[2]^2 - sigmasq)
+    }
+    
+    ss <- multiroot(f=prior, start = c(inits[1], inits[2]))
+    return(ss)
+}
 # augSIR wrapper ----------------------------------------------------------
 
 # augSIR is the wrapper to estimate SIR epidemic parameters via Bayesian data augmentation

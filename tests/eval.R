@@ -4,15 +4,15 @@
 
 # Simulate data -----------------------------------------------------------
 
-SIRres<-SIRsim(N = 200, S0 = 199, I0 = 1, b = 0.01, mu=.5, a=0, maxtime = 20,censusInterval=.01)
-SIRres = cbind(SIRres,200 - rowSums(SIRres[,2:3]))
-colnames(SIRres)<-c("time","susceptible","infected","recovered")
-
-# get data 
-dat <- data.frame(SIRres); dat$infected<-rbinom(n=dim(dat)[1], size=dat$infected, prob=0.2)
-dat.m <- melt(dat,id.vars="time")
-
-ggplot(dat.m, aes(x=time, y=value, colour=variable)) + geom_point() + theme_bw()
+# SIRres<-SIRsim(N = 200, S0 = 199, I0 = 1, b = 0.01, mu=.5, a=0, maxtime = 20,censusInterval=.01)
+# SIRres = cbind(SIRres,200 - rowSums(SIRres[,2:3]))
+# colnames(SIRres)<-c("time","susceptible","infected","recovered")
+# 
+# # get data 
+# dat <- data.frame(SIRres); dat$infected<-rbinom(n=dim(dat)[1], size=dat$infected, prob=0.2)
+# dat.m <- melt(dat,id.vars="time")
+# 
+# ggplot(dat.m, aes(x=time, y=value, colour=variable)) + geom_point() + theme_bw()
 
 SIRres<-SIRsim3(popsize = 200, S0 = 199, I0 = 1, b = 0.01, mu=.5, a=0, tmax = 20,censusInterval=0.5, prob=0.2)
 
@@ -68,8 +68,8 @@ inits <- list(beta.init = 0.01 + runif(1,-0.005, 0.005),
               alpha.init = 0, 
               probs.init = 0.2 + runif(1,-0.1, 0.1))
 
-priors <- list(beta.prior = c(6e-4, 0.05),
-               mu.prior = c(0.13, 0.24),
+priors <- list(beta.prior = c(.01, 1),
+               mu.prior = c(1, 2),
                alpha.prior = NULL,
                p.prior = c(0.022, 0.084))
 

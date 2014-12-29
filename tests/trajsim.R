@@ -148,16 +148,18 @@ trajecs.gg <- ggplot() + geom_line(data=trajecs,aes(x=time,y=infected,group=traj
 # Simulate data, first for the case where we observe with error ----------------------------------------------
 
 # get data
-dat2 <- SIRsim(popsize = 200, I0 = 1, S0 = 199, b = 0.01, mu = 0.5, tmax = 20, censusInterval = 1, prob = 0.2, binomsamp = TRUE, returnX = TRUE)
+dat2 <- SIRsim(popsize = 200, I0 = 1, S0 = 199, b = 0.01, mu = 0.5, a=0, tmax = 20, censusInterval = .25, sampprob = 0.2, binomsamp = TRUE, returnX = TRUE)
 
 dat.m2 <- melt(data.frame(dat2$results),id.vars="time"); truetraj <- data.frame(dat2$trajectory)
+truetrajec <- data.frame(time = unique(truetraj$time), 
+                         infected = c(sum(truetraj[truetraj[,1]==0,3]), sum(truetraj[truetraj[,1]==0,3]) + cumsum(truetraj[truetraj[,1]!=0,3])))
 
 ggplot(dat.m2,aes(x=time,y=value,colour=variable))+geom_point() + theme_bw()
 
 # initialize simulation settings
 popsize <- 200 # size of the population; 
 tmax <- 20 # maximum time of observation
-niter <- 1000 # number of iterations in the sampler
+niter <- 500 # number of iterations in the sampler
 amplify <- 2
 initdist <- c(0.995,0.005,0) # initial distribution for individual infection status
 
@@ -262,25 +264,37 @@ for(k in 1:(niter-1)){
 
 # Results for the case with error, p=0.2  -----------------------------------------------------------------
 
-trajectories2 <- data.frame(results2[[1]][[1]])
-for(j in 2:length(results2)){
-    trajectories2 <- rbind(trajectories2, data.frame(results2[[j]][[1]]))
+censusInterval <- 1; p <- 0.2
+trajectories2 <- list(); observations2 <- list(); likelihoods <- list()
+
+for(k in 1:(length(results.2) - 1)){
+    k <- k
+    traj <- results.2[[k]][[1]]
+    Xobs <- data.frame(time = unique(traj[,1]), 
+                       infected = c(sum(traj[traj[,1]==0,3]),sum(traj[traj[,1]==0,3]) + cumsum(traj[traj[,1]!=0,3])), 
+                       simnum = k)
+    trajectories2[[k]] <- Xobs
+    
+    obs <- data.frame(time = seq(0,max(Xobs$time),by=1), 
+                      truth = 0, 
+                      sampled = 0, 
+                      simnum = k)
+    
+    for(j in 1:dim(obs)[1]){
+        obs$truth[j] <- sum(traj[traj[,1]<=obs$time[j],3])
+    }
+    
+    obs$sampled <- rbinom(dim(obs)[1], obs$truth, prob = 0.2)
+    
+    observations2[[k]] <- obs
+    
+    
 }
-trajectories2$simnum <- rep(1:length(results2),each=400)
 
-trajecs2 <- data.frame(time = c(0,trajectories2$time[trajectories2$time!=0 & trajectories2$simnum==1]),
-                      infected = c(sum(trajectories2$event[trajectories2$time==0 & trajectories2$simnum==1]),
-                                   sum(trajectories2$event[trajectories2$time==0 & trajectories2$simnum==1]) + cumsum(trajectories2$event[trajectories2$time!=0 & trajectories2$simnum==1])),
-                      simnum = 1)
-for(j in 2:length(results2)){
-    trajecs2 <- rbind(trajecs2, data.frame(time = c(0,trajectories2$time[trajectories2$time!=0 & trajectories2$simnum==j]),
-                                         infected = c(sum(trajectories2$event[trajectories2$time==0 & trajectories2$simnum==j]),
-                                                      sum(trajectories2$event[trajectories2$time==0 & trajectories2$simnum==j]) + cumsum(trajectories2$event[trajectories2$time!=0 & trajectories2$simnum==j])),
-                                         simnum = j))
-}
+trajecs <- do.call(rbind,trajectories2)
+samples <- do.call(rbind,observations2)
 
-trajecs2.gg <- ggplot(data=subset(dat.m2,variable=="infected"),aes(x=time,y=value)) + geom_point(colour="red",size=4) + geom_line(data=trajecs2,aes(x=time,y=infected,group=simnum),alpha=0.2) + theme_bw()
-
+trajecs.gg <- ggplot(data = trajecs, aes(x = time, y = infected, group = simnum)) + geom_line(data = truetrajec, aes(x = time, y = infected),size = 1, colour = "red") + theme_bw()
 
 
 # Simulate data, first for the case where we observe with error ----------------------------------------------
