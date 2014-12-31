@@ -95,10 +95,13 @@ SIRsim <- function(popsize, S0, I0, b, mu, a=0, tmax, censusInterval, sampprob, 
             
         }
         
+        SIRres$Observed[1] <- max(1,SIRres$Observed[1])
+        
     }
     
-    if(any(SIRres[,2]==0 & SIRres[,3]==0)){
-        SIRres <- SIRres[1:(min(which(SIRres[,2]==0 & SIRres[,3]==0))),]
+    if(any(SIRres[,2]==0)){
+        ind <- ifelse(any(SIRres[,2]==0 & c(0, diff(SIRres[,2]))==0), which(SIRres[,2]==0 & c(0, diff(SIRres[,2]))==0), length(SIRres[,2]))
+        SIRres <- SIRres[1:ind,]
     }
     
     if(returnX == FALSE){

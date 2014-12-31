@@ -148,40 +148,57 @@ trajecs.gg <- ggplot() + geom_line(data=trajecs,aes(x=time,y=infected,group=traj
 # Simulate data, first for the case where we observe with error ----------------------------------------------
 
 # get data
-dat2 <- SIRsim(popsize = 200, I0 = 1, S0 = 199, b = 0.01, mu = 0.5, a=0, tmax = 20, censusInterval = .25, sampprob = 0.2, binomsamp = TRUE, returnX = TRUE)
+SIRres<-SIRsim(popsize = 200, S0 = 199, I0 = 1, b = 0.01, mu=.5, a=0, tmax = 20, censusInterval=0.25, sampprob = 0.25)
 
-dat.m2 <- melt(data.frame(dat2$results),id.vars="time"); truetraj <- data.frame(dat2$trajectory)
-truetrajec <- data.frame(time = unique(truetraj$time), 
-                         infected = c(sum(truetraj[truetraj[,1]==0,3]), sum(truetraj[truetraj[,1]==0,3]) + cumsum(truetraj[truetraj[,1]!=0,3])))
+# get data 
+dat <- SIRres[,c(1:2)]
+dat.m <- melt(SIRres,id.vars="time")
 
-ggplot(dat.m2,aes(x=time,y=value,colour=variable))+geom_point() + theme_bw()
+ggplot(dat.m, aes(x=time, y=value, colour=variable)) + geom_point() + theme_bw()
 
-# initialize simulation settings
-popsize <- 200 # size of the population; 
-tmax <- 20 # maximum time of observation
-niter <- 500 # number of iterations in the sampler
-amplify <- 2
-initdist <- c(0.995,0.005,0) # initial distribution for individual infection status
+sim.settings <- list(popsize = 200,
+                     tmax = 20,
+                     niter = 20,
+                     amplify = 5,
+                     initdist = c(0.995, 0.005, 0))
+
+inits <- list(beta.init = 0.01 + runif(1,-0.005, 0.005),
+              mu.init = 0.5 + runif(1, -0.05, 0.05),
+              alpha.init = 0, 
+              probs.init = 0.2 + runif(1,-0.1, 0.1))
+
+priors <- list(beta.prior = c(.01, 1),
+               mu.prior = c(1, 2),
+               alpha.prior = NULL,
+               p.prior = c(0.022, 0.084))
+
+
+popsize <- sim.settings$popsize # size of the population; 
+tmax <- sim.settings$tmax # maximum time of observation
+amplify <- sim.settings$amplify # amplification parameter for initialization
+niter <- sim.settings$niter # number of iterations in the sampler
+initdist <- sim.settings$initdist # initial distribution for individual infection status
 
 # vectors for parameters
-Beta <- vector(length=niter+1); Beta[1] <- 0.01 + runif(1,-0.0005,0.0005)
-Mu <- vector(length = niter+1); Mu[1] <- 0.5 + runif(1,-0.0005,0.0005)
-Alpha <- vector(length = niter+1); Alpha[1] <- 0 
-probs <- vector(length = niter+1); #probs[1] <- 0.2 + runif(1, -0.1, 0.1)
-probs[1] <- 0.2
- 
-results.2 <- vector("list",niter)
-# # vectors for parameters of distributions for beta, mu, and p. beta and mu have gamma distributions, p has beta distribution.
-# beta.prior <- c(12, 1200)
-# mu.prior <- c(6, 12)
+Beta <- vector(length=niter); Beta[1] <- inits$beta.init
+Mu <- vector(length = niter); Mu[1] <- inits$mu.init
+Alpha <- vector(length = niter); Alpha[1] <- inits$alpha.init 
+probs <- vector(length = niter); probs[1] <- inits$probs.init
+
+# vectors for parameters of distributions for beta, mu, and p. beta and mu have gamma distributions, p has beta distribution.
+beta.prior <- priors$beta.prior
+mu.prior <- priors$mu.prior
 # alpha.prior <- c(6, 12000)
-# p.prior <- c(9.5, 38)
+p.prior <- priors$p.prior
 
 # log-likelihood vector
 loglik <- vector(length=niter)
 
+# list to store trajectories
+trajectories <- list()
+
 # observation matrix
-W.cur <- as.matrix(data.frame(time = dat2$results[,1], Observed = dat2$results[,2], Truth = 0)); 
+W.cur <- as.matrix(data.frame(time = dat$time, sampled = dat$Observed, augmented = 0)); 
 
 # matrix with event times, subject id and event codes. 
 # Event codes: 1=carriage aquired, -1=carriage infected, 0=event out of time range
@@ -199,15 +216,19 @@ if(!checkpossible(X=X.cur, W=W.cur)) {
     }
 }
 
-irm.cur <- buildirm(X.cur, b = Beta[1], m = Mu[1], a = Alpha[1]) 
-pop_prob.cur <- pop_prob(X.cur, irm = irm.cur, initdist = initdist, popsize = popsize)
+trajectories[[1]] <- X.cur
+
+popirm.cur <- buildirm(X.cur, b = Beta[1], m = Mu[1], a = Alpha[1], popsize = popsize, pop = TRUE)
+pop_prob.cur <- pop_prob(X.cur, irm = popirm.cur, initdist = initdist, popsize = popsize)
 
 # M-H sampler
-for(k in 1:(niter-1)){
+for(k in 2:niter){
     # Update trajectories
     print(k)
     subjects <- sample(unique(X.cur[,2]),length(unique(X.cur[,2])),replace=TRUE)
-    accepts <- rep(0,length(subjects))
+    
+    pathirm.cur <- buildirm(X.cur, b = Beta[k-1], m = Mu[k-1], a = Alpha[k-1], popsize = popsize, pop = FALSE)
+    patheigen.cur <- irm_decomp(pathirm.cur)
     
     for(j in 1:length(subjects)){
         Xother <- X.cur[X.cur[,2]!=subjects[j],]
@@ -215,51 +236,54 @@ for(k in 1:(niter-1)){
         path.cur <- getpath(X.cur, subjects[j])
         
         W.other <-updateW(W.cur, Xother)
-        irm.other <- buildirm(Xother, b=Beta[k], m = Mu[k], a=Alpha[k])
-        Xt <- drawXt(Xother = Xother, irm = irm.other, W=W.other, p=probs[k], b=Beta[k], m=Mu[k], a=Alpha[k], initdist = initdist)
+        Xt <- drawXt(Xother = Xother, irm = pathirm.cur, irm.eig = patheigen.cur, W=W.other, p=probs[k-1], b=Beta[k-1], m=Mu[k-1], a=Alpha[k-1], initdist = initdist)
         
-        path.new<- drawpath(Xt, Xother, irm.other, tmax)
+        path.new<- drawpath(Xt, Xother, pathirm.cur, tmax)
         
         X.new <- updateX(X.cur,path.new,subjects[j]); path.new <- getpath(X.new,subjects[j])
-        irm.new <- buildirm(X.new, b = Beta[k], m = Mu[k], a = Alpha[k])
         
-        pop_prob.new <- pop_prob(X.new, irm = irm.new, initdist = initdist, popsize = popsize)
-        path_prob.new <- path_prob(path.new, Xother, irm.other, initdist, tmax)
-        path_prob.cur <- path_prob(path.cur, Xother, irm.other, initdist, tmax)
+        if(max(cumsum(X.new[,3])) == pathirm.cur[4,4,dim(pathirm.cur)[3]]){
+            new.numinf <- max(cumsum(X.new[,3]))+1
+            pathirm.cur <- update_irm(irm = pathirm.cur, new.numinf = new.numinf, b = Beta[k-1], m = Mu[k-1], a = Alpha[k-1], popsize = popsize)
+            patheigen.cur <- update_eigen(patheigen = patheigen.cur, pathirm = pathirm.cur, ind = new.numinf)
+        } 
+        
+        popirm.new <- buildirm(X.new, b = Beta[k-1], m = Mu[k-1], a = Alpha[k-1], popsize = popsize, pop = TRUE)
+        pop_prob.new <- pop_prob(X.new, irm = popirm.new, initdist = initdist, popsize = popsize)
+        
+        path_prob.new <- path_prob(path.new, Xother, pathirm.cur, initdist, tmax)
+        path_prob.cur <- path_prob(path.cur, Xother, pathirm.cur, initdist, tmax)
         
         a.prob <- pop_prob.new - pop_prob.cur + path_prob.cur - path_prob.new
         
         if(min(a.prob, 0) > log(runif(1))) {
             X.cur <- X.new
             W.cur <- updateW(W.cur,X.cur)
-            irm.cur <- irm.new
+            popirm.cur <- popirm.new
             pop_prob.cur <- pop_prob.new
-            accepts[j] <- 1
-            
         }
     }
     
-    # Update observation matrix
-    #     W <- updateW(W, X)
-    
     # draw new binomial sampling probability parameter
-    #   probs[k+1] <- rbeta(1,p.prior[1] + sum(W[,2]), p.prior[2] + sum(W[,3]-W[,2]))
-    probs[k+1] <- probs[k]
+    probs[k] <- rbeta(1,p.prior[1] + sum(W.cur[,2]), p.prior[2] + sum(W.cur[,3]-W.cur[,2]))
     
     # draw new rate parameters 
-    Beta[k+1] <- Beta[k]
+    Beta[k] <- update_beta(X.cur = X.cur, beta.prior = beta.prior, popsize = popsize)
     
-    Mu[k+1] <- Mu[k]
+    Mu[k] <- update_mu(X.cur = X.cur, mu.prior = mu.prior)
     
-    #   Alpha[k+1] <- rgamma(1, shape = (alpha.prior[1] + sum(X[,3]==1)),
-    #                        rate = alpha.prior[2] + sum((popsize - cumsum(X[,3]==1))*c(0,X[2:dim(X)[1],1] - X[1:(dim(X)[1]-1),1])*(X[,3]==1)))
-    Alpha[k+1] <- Alpha[k]
+    #   Alpha[k] <- update_alpha(X.cur = X.cur, alpha.prior = alpha.prior, popsize = popsize)
     
-    #     loglik[k] <- calc_loglike(X, W, Beta[k+1], Mu[k+1], Alpha[k+1], probs[k+1])  
+    Alpha[k] <- 0
     
-    # store results
-    results.2[[k]] <- list(trajectories = X.cur, accepts = mean(accepts), prob = pop_prob(X.new, irm.new, initdist, popsize))    
-}
+    loglik[k] <- calc_loglike(X = X.cur, W = W.cur, irm = popirm.cur, b = Beta[k], m = Mu[k], a = Alpha[k], p = probs[k], initdist = initdist, popsize = popsize)  
+    
+    trajectories[[k]] <- X.cur
+    
+    }
+
+results2 <- list(Beta = Beta, Mu = Mu, loglik = loglik, trajectories = trajectories) 
+
 
 
 # Results for the case with error, p=0.2  -----------------------------------------------------------------
@@ -288,11 +312,12 @@ for(k in 1:(length(results.2) - 1)){
     
     observations2[[k]] <- obs
     
-    
+    likelihoods[[k]] <- results.2[[k]][[3]]
 }
 
 trajecs <- do.call(rbind,trajectories2)
 samples <- do.call(rbind,observations2)
+likelihoods <- do.call(rbind,likelihoods)
 
 trajecs.gg <- ggplot(data = trajecs, aes(x = time, y = infected, group = simnum)) + geom_line(data = truetrajec, aes(x = time, y = infected),size = 1, colour = "red") + theme_bw()
 
