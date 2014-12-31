@@ -158,7 +158,7 @@ ggplot(dat.m, aes(x=time, y=value, colour=variable)) + geom_point() + theme_bw()
 
 sim.settings <- list(popsize = 200,
                      tmax = 20,
-                     niter = 20,
+                     niter = 10000,
                      amplify = 5,
                      initdist = c(0.995, 0.005, 0))
 

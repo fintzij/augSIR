@@ -177,7 +177,7 @@ fwd <- function(Xother, W, irm, irm.eig, initdist, p){
     
     tpm <- obstpm(numinf = numinf, eventtimes = eventtimes, irm = irm, irm.eig = irm.eig, t0 = obstimes[1], t1 = obstimes[2])
         
-    numinf.aug <- numinf[eventtimes<=obstimes[2]][sum(eventtimes<=obstimes[2])]; numinf.obs <- W[W[,1]==obstimes[2],2]
+    numinf.aug <- numinf[eventtimes<=obstimes[2]][sum(eventtimes<=obstimes[2])]; numinf.obs <- W[2,2]
     
     if(p!=1){
         emit <- dbinom(numinf.obs, numinf.aug +c(0,1,0),p) #### check this with Vladimir. possible the emission probability in the recovered state depends on previous infection status
@@ -462,10 +462,18 @@ calc_loglike <- function(X, W, irm, b, m, a=0, p, initdist, popsize){
 # pop_prob and path_prob calculate the log-probabilities of the population trajectory and the subject trajectory for use in the M-H ratio
 
 pop_prob <- function(X, irm, initdist, popsize){
-    Xobs <- rbind(c(0,0,sum(X[X[,1]==0,3])), X[X[,1]!=0,]); init.infec <- sum(X[,3]==1 & X[,1]==0)
-    events <- ifelse(Xobs[Xobs[,1]!=0,3]==1, 1,2); rates <- ifelse(events==1,irm[1,2,], irm[2,3,])
-    
-    dmultinom(c(popsize - init.infec, init.infec, 0), prob = initdist, log=TRUE) + sum(log(rates)) - sum(rates*(Xobs[2:dim(Xobs)[1],1] - Xobs[1:(dim(Xobs)[1]-1),1]))
+
+        Xobs <- rbind(c(0,0,sum(X[X[,1]==0,3])), X[X[,1]!=0,])
+        init.infec <- sum(X[,3]==1 & X[,1]==0)
+        events <- ifelse(Xobs[Xobs[,1]!=0,3]==1, 1,2); rates <- ifelse(events==1,irm[1,2,], irm[2,3,])
+        
+        # note that it is possible to have an impossible trajectory proposed if the infection is depleted between time 0 and the first observation time, but there are still enough
+        # augmented infections by the first observation time (this is the first time for which an emission probability is computed). Therefore, rates are set to max(0, rates)
+        
+        rates <- pmax(0,rates)
+        
+        dmultinom(c(popsize - init.infec, init.infec, 0), prob = initdist, log=TRUE) + sum(log(rates)) - sum(rates*diff(Xobs[,1]))
+
 }
 
 path_prob <- function(path, Xother, pathirm, initdist, tmax){
@@ -647,7 +655,7 @@ augSIR <- function(dat, sim.settings, priors, inits) {
     }
     
     popirm.cur <- buildirm(X.cur, b = Beta[1], m = Mu[1], a = Alpha[1], popsize = popsize, pop = TRUE)
-    pop_prob.cur <- pop_prob(X.cur, irm = popirm.cur, initdist = initdist, popsize = popsize)
+    pop_prob.cur <- pop_prob(X.cur, iprm = popirm.cur, initdist = initdist, popsize = popsize)
     
     # M-H sampler
     for(k in 2:niter){
