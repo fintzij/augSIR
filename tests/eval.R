@@ -4,7 +4,6 @@
 
 # augSIR simulation -------------------------------------------------------
 
-
 # simulation
 SIRres<-SIRsim(popsize = 200, S0 = 199, I0 = 1, b = 0.01, mu=.5, a=0, tmax = 20, censusInterval=0.25, sampprob = 0.25)
 

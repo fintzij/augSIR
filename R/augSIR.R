@@ -127,7 +127,7 @@ drawtime <- function(Xother, irm, t0, t1, currentstate){
                         intervalprobs[k] <- (1-exp(-sum(irm[1, 2,match(numinf[indstart:ind], irm[4,4,])]*timediffs[1:k])))/totalprob
                     }
                     
-                    interval <- which(intervalprobs > 0.5)[1]
+                    interval <- which(intervalprobs > runif(1))[1]
                     ind <- sum(times <= timeseq[interval])
                     
                     eventtime<-timeseq[interval]-log(1-runif(1)*(1-exp(-irm[1, 2, match(numinf[ind], irm[4,4,])]*timediffs[interval])))/irm[1, 2, match(numinf[ind], irm[4,4,])]
@@ -152,16 +152,22 @@ drawtime <- function(Xother, irm, t0, t1, currentstate){
 # Xother is a matrix with the times of carriage aquisition and clearance for all other subjects. 
 # p, is the sampling probability, and b, and m are the epidemiologic parameters. initdist is the initial
 # distribution for infection status
+
 drawXt <- function(Xother, irm, irm.eig, W, p, b, m, a, initdist){
+    
+    ### ask about this, does it make more sense to use a different initial dist for this case, or should the trajectory not be 
+    ### simulated outright.
+    if (sum(Xother[,3][Xother[,1]==0])<W[1,2]) {
+        initdist <- c(0,1,0)
+    } 
     
     Xt <- cbind(W[,1], 0)
     
     Xt.fb <- fwd(Xother, W, irm, irm.eig, initdist, p)
     
     Xt<-bwd(Xt.fb,Xt)
-    if(all(Xt[,2]==3)){
-        Xt[,2] <- 1
-    }
+    
+    if(all(Xt[,2]==3)) break
     
     return(Xt)
 }
@@ -172,11 +178,15 @@ drawXt <- function(Xother, irm, irm.eig, W, p, b, m, a, initdist){
 fwd <- function(Xother, W, irm, irm.eig, initdist, p){
     
     Xt.fb <- array(0,dim=c(3,3,dim(W)[1]-1))
-    obstimes <- W[,1]; eventtimes <- unique(Xother[,1])
+    obstimes <- W[,1]
+    
+    eventtimes <- unique(c(0, Xother[,1]))
+    
     init.infec <- sum(Xother[,3]==1 & Xother[,1]==0); numinf <- c(init.infec, init.infec + cumsum(Xother[Xother[,1]!=0,3]))
     
     tpm <- obstpm(numinf = numinf, eventtimes = eventtimes, irm = irm, irm.eig = irm.eig, t0 = obstimes[1], t1 = obstimes[2])
         
+    numinf.aug <- sum(Xother[,3][Xother[,1]<=obstimes[2]])
     numinf.aug <- numinf[eventtimes<=obstimes[2]][sum(eventtimes<=obstimes[2])]; numinf.obs <- W[2,2]
     
     if(p!=1){
@@ -194,7 +204,8 @@ fwd <- function(Xother, W, irm, irm.eig, initdist, p){
         
         distr <- colSums(Xt.fb[,,k-1])
         
-        numinf.aug <- numinf[eventtimes<=obstimes[k+1]][sum(eventtimes<=obstimes[k+1])]; numinf.obs <- W[W[,1]==obstimes[k+1],2]
+        numinf.aug <- sum(Xother[,3][Xother[,1]<=obstimes[k+1]]); numinf.obs <- W[W[,1]==obstimes[k+1],2]
+        numinf.aug <- numinf[eventtimes <= obstimes[k+1]][sum(eventtimes <= obstimes[k+1])]
         
         if(p==1){
             emit <- dbinom(numinf.obs, min(numinf.aug, numinf.obs) +c(0,1,0),p)
@@ -217,13 +228,12 @@ bwd <- function(Xt.fb,Xt){
     states <- rep(0,dim(Xt)[1]); draws <- runif(dim(Xt)[1])
     
     initdist<-cumsum(colSums(Xt.fb[,,dim(Xt.fb)[3]]))
-    currentstate<- which(initdist >= draws[length(states)])[sum(initdist >= draws[length(states)])] 
-    states[length(states)] <- currentstate
+
+    states[length(states)] <- which(initdist >= draws[length(states)])[1] 
     
     for(k in (dim(Xt)[1] - 1):1){
-        dist<-cumsum(normalize(Xt.fb[,currentstate,k]))
-        currentstate<- which(dist >= draws[k])[1] 
-        states[k] <- currentstate
+        dist<-cumsum(normalize(Xt.fb[,states[k+1],k]))
+        states[k] <- which(dist >= draws[k])[1] 
     }
     Xt[,2] <- states
     return(Xt)
@@ -237,7 +247,7 @@ normalize <- function(X){
     X/sum(X)
 }
 
-buildirm <- function(X, b, m, a, popsize, pop=FALSE){
+buildirm <- function(X, b, m, a, popsize, pop){
     init.infec <- sum(X[,3]==1 & X[,1]==0)
     
     if(pop == FALSE){
@@ -561,6 +571,15 @@ update_alpha <- function(X.cur, alpha.prior, popsize){
            rate = alpha.prior[2] + sum((popsize - cumsum(X.cur[,3]==1))*c(0,X.cur[2:dim(X.cur)[1],1] - X.cur[1:(dim(X.cur)[1]-1),1])*(X.cur[,3]==1)))
 }
 
+# accept_prob calculates the acceptance ratio for the M-H algorithm
+accept_prob <- function(pop_prob.new, pop_prob.cur, path_prob.cur, path_prob.new){
+    if(pop_prob.new == -Inf & path_prob.new == -Inf){
+        -Inf
+    } else{
+        pop_prob.new - pop_prob.cur + path_prob.cur - path_prob.new
+    }
+}
+
 # checkpossible checks whether removing a subject to resimulate the epidemic would cause an impossible population trajectory. If so, M-H automatically rejects.
 
 checkpossible <- function(X, a=0, W=NULL){
@@ -655,7 +674,7 @@ augSIR <- function(dat, sim.settings, priors, inits) {
     }
     
     popirm.cur <- buildirm(X.cur, b = Beta[1], m = Mu[1], a = Alpha[1], popsize = popsize, pop = TRUE)
-    pop_prob.cur <- pop_prob(X.cur, iprm = popirm.cur, initdist = initdist, popsize = popsize)
+    pop_prob.cur <- pop_prob(X.cur, irm = popirm.cur, initdist = initdist, popsize = popsize)
     
     # M-H sampler
     for(k in 2:niter){
@@ -690,7 +709,7 @@ augSIR <- function(dat, sim.settings, priors, inits) {
             path_prob.new <- path_prob(path.new, Xother, pathirm.cur, initdist, tmax)
             path_prob.cur <- path_prob(path.cur, Xother, pathirm.cur, initdist, tmax)
             
-            a.prob <- pop_prob.new - pop_prob.cur + path_prob.cur - path_prob.new
+            a.prob <- accept_prob(pop_prob.new, pop_prob.cur, path_prob.cur, path_prob.new)
             
             if(min(a.prob, 0) > log(runif(1))) {
                 X.cur <- X.new
@@ -698,6 +717,7 @@ augSIR <- function(dat, sim.settings, priors, inits) {
                 popirm.cur <- popirm.new
                 pop_prob.cur <- pop_prob.new
             }
+            
         }
         
         # draw new binomial sampling probability parameter
