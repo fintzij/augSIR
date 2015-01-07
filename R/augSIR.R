@@ -8,7 +8,7 @@
 
 drawpath <- function(Xt, Xother, irm, tmax){
     path <- c(0,0)
-    changetimes <- which(Xt[2:dim(Xt)[1],2] - Xt[1:(dim(Xt)[1]-1),2] != 0)
+    changetimes <- which(diff(Xt[,2]) != 0)
     
     if(length(changetimes)==0){
         if(all(Xt[,2]==2)){
@@ -28,13 +28,13 @@ drawpath <- function(Xt, Xother, irm, tmax){
             }
         }
         
-    } else if(length(changetimes)==1){
-        if(Xt[changetimes+1,2] - Xt[changetimes,2] ==2){
+    } else if(length(changetimes)==1){ ### all transitions occur in one observation period
+        if(Xt[changetimes+1,2] - Xt[changetimes,2] ==2){ ### Subject transitions from healthy to recovered within one observation period
             t0 <- Xt[changetimes,1]; t1 <- Xt[changetimes+1,1]
             path[1] <- drawtime(Xother, irm, t0, t1, 1)
             path[2] <- ifelse(path[1]==Inf,Inf,drawtime(Xother, irm, path[1], t1, 2))
             
-        } else if(Xt[changetimes,2]==1 & (Xt[changetimes+1,2] - Xt[changetimes,2] == 1)){
+        } else if(Xt[changetimes,2]==1 & (Xt[changetimes+1,2] - Xt[changetimes,2] == 1)){ # healthy to infected within one observation period
             t0 <- Xt[changetimes,1]; t1 <- Xt[changetimes+1,1]
             path[1] <- drawtime(Xother, irm, t0, t1, 1)
             
@@ -65,9 +65,8 @@ drawpath <- function(Xt, Xother, irm, tmax){
 # current state is the infection status at t0. 
 
 
-
 drawtime <- function(Xother, irm, t0, t1, currentstate){
-    times <- unique(Xother[,1])
+    times <- unique(c(0,Xother[,1]))
     
     if(t1 == Inf){
         if(currentstate == 2){
@@ -137,7 +136,7 @@ drawtime <- function(Xother, irm, t0, t1, currentstate){
                     
                     indstart <- sum(times<=timeseq[1]); indend <- sum(times<=timeseq[length(timeseq)-1])
                     
-                    eventtime <- t0 - log(1 - runif(1)*(1 - exp(-irm[1, 2, match(numinf[ind], irm[4,4,])])))/irm[1, 2, match(numinf[ind], irm[4,4,])]
+                    eventtime <- t0 - log(1 - runif(1)*(1 - exp(-irm[1, 2, match(numinf[ind], irm[4,4,])]*(t1 - t0))))/irm[1, 2, match(numinf[ind], irm[4,4,])]
                 }
                 
             }
@@ -157,18 +156,16 @@ drawXt <- function(Xother, irm, irm.eig, W, p, b, m, a, initdist){
     
     ### ask about this, does it make more sense to use a different initial dist for this case, or should the trajectory not be 
     ### simulated outright.
-    if (sum(Xother[,3][Xother[,1]==0])<W[1,2]) {
-        initdist <- c(0,1,0)
-    } 
+#     if (sum(Xother[,3][Xother[,1]==0])<W[1,2]) {
+#         initdist <- c(0,1,0)
+#     } 
     
     Xt <- cbind(W[,1], 0)
     
     Xt.fb <- fwd(Xother, W, irm, irm.eig, initdist, p)
     
     Xt<-bwd(Xt.fb,Xt)
-    
-    if(all(Xt[,2]==3)) break
-    
+        
     return(Xt)
 }
 
@@ -186,11 +183,10 @@ fwd <- function(Xother, W, irm, irm.eig, initdist, p){
     
     tpm <- obstpm(numinf = numinf, eventtimes = eventtimes, irm = irm, irm.eig = irm.eig, t0 = obstimes[1], t1 = obstimes[2])
         
-    numinf.aug <- sum(Xother[,3][Xother[,1]<=obstimes[2]])
     numinf.aug <- numinf[eventtimes<=obstimes[2]][sum(eventtimes<=obstimes[2])]; numinf.obs <- W[2,2]
     
     if(p!=1){
-        emit <- dbinom(numinf.obs, numinf.aug +c(0,1,0),p) #### check this with Vladimir. possible the emission probability in the recovered state depends on previous infection status
+        emit <- dbinom(numinf.obs, numinf.aug +c(0,1,0),p) 
         
     } else if(p==1){
         emit <- dbinom(numinf.obs, min(numinf.aug, numinf.obs) +c(0,1,0),p)
@@ -204,13 +200,13 @@ fwd <- function(Xother, W, irm, irm.eig, initdist, p){
         
         distr <- colSums(Xt.fb[,,k-1])
         
-        numinf.aug <- sum(Xother[,3][Xother[,1]<=obstimes[k+1]]); numinf.obs <- W[W[,1]==obstimes[k+1],2]
-        numinf.aug <- numinf[eventtimes <= obstimes[k+1]][sum(eventtimes <= obstimes[k+1])]
+        numinf.aug <- numinf[eventtimes <= obstimes[k+1]][sum(eventtimes <= obstimes[k+1])]; numinf.obs <- W[W[,1]==obstimes[k+1],2]
         
         if(p==1){
             emit <- dbinom(numinf.obs, min(numinf.aug, numinf.obs) +c(0,1,0),p)
             
         } else if(p!=1){
+            #### check this with Vladimir. the emission probability in the recovered state may depend on previous and future infection status
             emit <- dbinom(numinf.obs, numinf.aug +c(0,1,0),p)
             
         }
@@ -247,7 +243,7 @@ normalize <- function(X){
     X/sum(X)
 }
 
-buildirm <- function(X, b, m, a, popsize, pop){
+buildirm <- function(X, b, m, a=0, popsize, pop){
     init.infec <- sum(X[,3]==1 & X[,1]==0)
     
     if(pop == FALSE){
@@ -291,30 +287,17 @@ update_irm <- function(irm, new.numinf, b, m , a , popsize ){
     newmat[2,3] <- m; newmat[2,2] <- -m
     newmat[4,4] <- new.numinf
     
-    if(new.numinf == 0){
-        irm.new <- array(c(newmat,irm), dim = c(4,4,dim(irm)[3]+1))
-        
-    } else if(new.numinf != 0){
-        irm.new <- array(c(irm,newmat), dim = c(4,4,dim(irm)[3]+1))
-        
-    }
+    irm.new <- array(c(irm,newmat), dim = c(4,4,dim(irm)[3]+1))
     
     return(irm.new)
 }
 
-update_eigen <- function(patheigen, pathirm, ind){
-    decomp <- eigen(pathirm[c(1:3),c(1:3),match(ind, pathirm[4,4,])], symmetric = FALSE)
+update_eigen <- function(patheigen, pathirm){
+    decomp <- eigen(pathirm[c(1:3),c(1:3),dim(pathirm)[3]], symmetric = FALSE)
     
-    if(ind == 0){
-        eigen.new <- array(c(array(c(diag(decomp$values), decomp$vectors, solve(decomp$vectors)), 
-                                   dim = c(3,3,3)), patheigen), dim = c(3,3,3,dim(patheigen)[4] + 1))
-        
-    } else if(ind != 0){
-        eigen.new <- array(c(patheigen, 
+    eigen.new <- array(c(patheigen, 
                              array(c(diag(decomp$values), decomp$vectors, solve(decomp$vectors)), dim = c(3,3,3))), 
                            dim = c(3,3,3,dim(patheigen)[4] + 1))        
-        
-    }
     
     return(eigen.new)    
 }
@@ -419,13 +402,10 @@ updateW <- function(W, X){
 # updateX updates the matix of observations X whose columns are event times, subject id, and event codes. Inputs are the original X matrix,
 # a vector of times, and the subject id. The function returns an update X matrix, ordered by event time. 
 updateX <- function(X, Xt.path, j){
-    if(all(Xt.path==0)){
+    if(all(Xt.path == 0) | all(Xt.path == Inf)){
         X[X[,2]==j,c(1,3)] <- 0
         
-    } else if(all(Xt.path==Inf)){
-        X[X[,2]==j,c(1,3)] <- 0
-        
-    } else if(Xt.path[1] != Inf & Xt.path[2] ==Inf){
+    }  else if(Xt.path[1] != Inf & Xt.path[2] ==Inf){
         X[X[,2]==j,][1,1] <- Xt.path[1]; X[X[,2]==j,][1,3] <- 1
         X[X[,2]==j,][2,1] <- 0 ; X[X[,2]==j,][2,3] <- 0
         
@@ -461,12 +441,11 @@ getpath <- function(X, j) {
 # Other functions ---------------------------------------------------------
 
 calc_loglike <- function(X, W, irm, b, m, a=0, p, initdist, popsize){
-#     popsize = length(unique(X[,2])); times <- unique(X[,1]); timediffs <- times[2:length(times)] - times[1:(length(times)-1)]
-    Xobs <- rbind(c(0,0,sum(X[X[,1]==0,3])), X[X[,1]!=0,])
-    initinfec <- sum(X[X[,1]==0, 3])
+    initinfec <- sum(X[,3][X[,1]==0])
+    Xobs <- rbind(c(0,0,initinfec), X[X[,1]!=0,]); timediffs <- diff(unique(c(0,X[,1])))
     events <- ifelse(Xobs[Xobs[,1]!=0,3]==1, 1,2); rates <- ifelse(events==1,irm[1,2,], irm[2,3,])
     
-    dbinom(sum(W[,2]), sum(W[,3]), prob=p, log=TRUE) + dmultinom(c(popsize - initinfec, initinfec, 0), prob = initdist, log=TRUE) + sum(log(rates)) - sum(rates*(diff(Xobs[,1])))
+    dbinom(sum(W[,2]), sum(W[,3]), prob=p, log=TRUE) + dmultinom(c(popsize - initinfec, initinfec, 0), prob = initdist, log=TRUE) + sum(log(rates)) - sum(rates*timediffs)
 } 
 
 # pop_prob and path_prob calculate the log-probabilities of the population trajectory and the subject trajectory for use in the M-H ratio
@@ -486,8 +465,9 @@ pop_prob <- function(X, irm, initdist, popsize){
 
 }
 
+
 path_prob <- function(path, Xother, pathirm, initdist, tmax){
-    times <- c(unique(Xother[,1]), tmax); timediffs <- diff(times)
+    times <- c(unique(c(0,Xother[,1])), tmax); timediffs <- diff(times)
     init.infec <- sum(Xother[,3]==1 & Xother[,1]==0); numinf <- c(init.infec, init.infec + cumsum(Xother[Xother[,1]!=0,3]))
     
     if(all(path==0)){ # no infection observed
@@ -502,9 +482,10 @@ path_prob <- function(path, Xother, pathirm, initdist, tmax){
             
         } else if(path[1]!=0){ # subject is not initially infected
                         
-            if(times[2] > path[1]){ # no changes in number of infecteds before subject's infection
+            if(times[2] > path[1]){ # no changes in number of other infecteds before subject's infection
                 
-                path.prob <- log(initdist[1]) + log(pathirm[1,2, match(init.infec,pathirm[4,4,])]) - pathirm[1,2,match(init.infec, pathirm[4,4,])]*path[1] + log(pathirm[2,3,1]) - pathirm[2,3,1]*(path[2] - path[1])
+                path.prob <- log(initdist[1]) + log(pathirm[1,2, match(init.infec,pathirm[4,4,])]) - pathirm[1,2,match(init.infec, pathirm[4,4,])]*path[1] + 
+                    log(pathirm[2,3,1]) - pathirm[2,3,1]*(path[2] - path[1])
                 
             } else if(times[2] < path[1]){ # if there is at least one change in the number of infecteds before the subject's infection
                 ind1 <- which(times < path[1])[sum(times < path[1])]
@@ -548,7 +529,7 @@ update_beta <- function(X.cur, beta.prior, popsize){
     
     init.infec <- sum(X.cur[,1] == 0 & X.cur[,3]==1); infections <- X[,3] == 1; 
     numsick <- c(init.infec, init.infec + cumsum(X[,3])); numsusc <- popsize - cumsum(c(init.infec,X[,3]==1)) 
-    timediffs <- diff(c(0,X[,1]), lag = 1)
+    timediffs <- diff(c(0,X[,1]))
     
     rgamma(1, shape = (beta.prior[1] + sum(infections)), 
            rate = beta.prior[2] + sum(numsick[1:(length(numsick)-1)] * numsusc[1:(length(numsusc) - 1)] * timediffs * infections))
@@ -698,9 +679,9 @@ augSIR <- function(dat, sim.settings, priors, inits) {
             X.new <- updateX(X.cur,path.new,subjects[j]); path.new <- getpath(X.new,subjects[j])
             
             if(max(cumsum(X.new[,3])) == pathirm.cur[4,4,dim(pathirm.cur)[3]]){
-                new.numinf <- max(cumsum(X.new[,3]))+1
+                new.numinf <- pathirm.cur[4,4,dim(pathirm.cur)[3]]+1
                 pathirm.cur <- update_irm(irm = pathirm.cur, new.numinf = new.numinf, b = Beta[k-1], m = Mu[k-1], a = Alpha[k-1], popsize = popsize)
-                patheigen.cur <- update_eigen(patheigen = patheigen.cur, pathirm = pathirm.cur, ind = new.numinf)
+                patheigen.cur <- update_eigen(patheigen = patheigen.cur, pathirm = pathirm.cur)
             } 
 
             popirm.new <- buildirm(X.new, b = Beta[k-1], m = Mu[k-1], a = Alpha[k-1], popsize = popsize, pop = TRUE)
@@ -713,7 +694,7 @@ augSIR <- function(dat, sim.settings, priors, inits) {
             
             if(min(a.prob, 0) > log(runif(1))) {
                 X.cur <- X.new
-                W.cur <- updateW(W.cur,X.cur)
+                W.cur <- updateW(W.cur,X.new)
                 popirm.cur <- popirm.new
                 pop_prob.cur <- pop_prob.new
             }

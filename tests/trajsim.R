@@ -11,7 +11,14 @@
 # 
 # ggplot(dat.m, aes(x=time, y=value, colour=variable)) + geom_point() + theme_bw()
 
-SIRres<-SIRsim(popsize = 200, S0 = 199, I0 = 1, b = 0.01, mu=.5, a=0, tmax = 20, censusInterval=0.5, sampprob = 0.25, returnX = TRUE)
+SIRres<-SIRsim(popsize = 200, S0 = 199, I0 = 1, b = 0.01, mu=.5, a=0, tmax = 20, censusInterval=.25, sampprob = 0.25, returnX = TRUE)
+
+if(dim(SIRres$results)[1] < 10){
+    while(dim(SIRres$results)[1] < 10){
+        SIRres<-SIRsim(popsize = 200, S0 = 199, I0 = 1, b = 0.01, mu=.5, a=0, tmax = 20, censusInterval=.25, sampprob = 0.25, returnX = TRUE)
+        
+    }
+}
 
 # get data 
 dat <- SIRres$results
@@ -20,7 +27,7 @@ dat.m <- melt(dat,id.vars="time")
 ggplot(dat.m, aes(x=time, y=value, colour=variable)) + geom_point() + theme_bw()
 
 sim.settings <- list(popsize = 200,
-                     tmax = 20,
+                     tmax = 200,
                      niter = 10000,
                      amplify = 5,
                      initdist = c(0.995, 0.005, 0))
@@ -83,13 +90,14 @@ trajectories[[1]] <- X.cur
 popirm.cur <- buildirm(X.cur, b = Beta[1], m = Mu[1], a = Alpha[1], popsize = popsize, pop = TRUE)
 pop_prob.cur <- pop_prob(X.cur, irm = popirm.cur, initdist = initdist, popsize = popsize)
 
+keep.going <- TRUE
 # M-H sampler
 for(k in 2:niter){
     # Update trajectories
     print(k)
     subjects <- sample(unique(X.cur[,2]),length(unique(X.cur[,2])),replace=TRUE)
     
-    pathirm.cur <- buildirm(X.cur, b = Beta[k-1], m = Mu[k-1], a = Alpha[k-1], popsize = popsize, pop = FALSE)
+    pathirm.cur <- buildirm(X = X.cur, b = Beta[k-1], m = Mu[k-1], a = Alpha[k-1], popsize = popsize, pop = FALSE)
     patheigen.cur <- irm_decomp(pathirm.cur)
     
     for(j in 1:length(subjects)){
@@ -100,14 +108,20 @@ for(k in 2:niter){
         W.other <-updateW(W.cur, Xother)
         Xt <- drawXt(Xother = Xother, irm = pathirm.cur, irm.eig = patheigen.cur, W=W.other, p=probs[k-1], b=Beta[k-1], m=Mu[k-1], a=Alpha[k-1], initdist = initdist)
         
+        #### Check here
+        if(any(diff(Xt[,2])<0)) {
+            keep.going <- FALSE
+            break
+        }
+        
         path.new<- drawpath(Xt, Xother, pathirm.cur, tmax)
         
         X.new <- updateX(X.cur,path.new,subjects[j]); path.new <- getpath(X.new,subjects[j])
         
         if(max(cumsum(X.new[,3])) == pathirm.cur[4,4,dim(pathirm.cur)[3]]){
-            new.numinf <- max(cumsum(X.new[,3]))+1
+            new.numinf <- pathirm.cur[4,4,dim(pathirm.cur)[3]]+1
             pathirm.cur <- update_irm(irm = pathirm.cur, new.numinf = new.numinf, b = Beta[k-1], m = Mu[k-1], a = Alpha[k-1], popsize = popsize)
-            patheigen.cur <- update_eigen(patheigen = patheigen.cur, pathirm = pathirm.cur, ind = new.numinf)
+            patheigen.cur <- update_eigen(patheigen = patheigen.cur, pathirm = pathirm.cur)
         } 
         
         popirm.new <- buildirm(X.new, b = Beta[k-1], m = Mu[k-1], a = Alpha[k-1], popsize = popsize, pop = TRUE)
@@ -120,15 +134,19 @@ for(k in 2:niter){
         
         if(min(a.prob, 0) > log(runif(1))) {
             X.cur <- X.new
-            W.cur <- updateW(W.cur,X.cur)
+            W.cur <- updateW(W.cur,X.new)
             popirm.cur <- popirm.new
             pop_prob.cur <- pop_prob.new
         }
         
-        if(any(W.cur[,3]<W.cur[,2])) break
+        #### check here
+        if(any(W.cur[,3]<W.cur[,2])) {
+            keep.going <- FALSE
+            break
+        }
         
     }
-    
+        
     # draw new binomial sampling probability parameter
     probs[k] <- rbeta(1,p.prior[1] + sum(W.cur[,2]), p.prior[2] + sum(W.cur[,3]-W.cur[,2]))
     
@@ -145,26 +163,31 @@ for(k in 2:niter){
     
     trajectories[[k]] <- X.cur
     
+    #### check here
+    
+    if(loglik[k]==0) keep.going <- FALSE
+    
+    if(keep.going == FALSE) break
+    
 }
 
 results2 <- list(Beta = Beta, Mu = Mu, loglik = loglik, trajectories = trajectories) 
 
 
-
 # Results for the case with error, p=0.2  -----------------------------------------------------------------
 
-censusInterval <- 0.5; p <- 0.2
+censusInterval <- 0.25; p <- 0.2
 trajectories2 <- list(); observations2 <- list(); likelihoods <- list()
 
 for(k in 1:(length(results2[[4]]))){
-    k <- k
+    if ((k%%25)==0){
     traj <- results2[[4]][[k]]
     Xobs <- data.frame(time = unique(traj[,1]), 
                        infected = c(sum(traj[traj[,1]==0,3]),sum(traj[traj[,1]==0,3]) + cumsum(traj[traj[,1]!=0,3])), 
                        simnum = k)
     trajectories2[[k]] <- Xobs
     
-    obs <- data.frame(time = seq(0,max(Xobs$time),by=1), 
+    obs <- data.frame(time = seq(0,max(Xobs$time),by=0.25), 
                       truth = 0, 
                       sampled = 0, 
                       simnum = k)
@@ -176,8 +199,8 @@ for(k in 1:(length(results2[[4]]))){
     obs$sampled <- rbinom(dim(obs)[1], obs$truth, prob = 0.2)
     
     observations2[[k]] <- obs
+    }
     
-    likelihoods[[k]] <- results2[[3]][[k]]
 }
 
 trajecs <- do.call(rbind,trajectories2)
@@ -185,11 +208,11 @@ samples <- do.call(rbind,observations2)
 likelihoods <- do.call(rbind,likelihoods)
 
 truetrajec <- data.frame(time = unique(SIRres$trajectory[,1]), 
-                         infected = c(sum(SIRres$trajectory[SIRres$trajectory[,1]==0,3]), sum(SIRres$trajectory[SIRres$trajectory[,1]==0,3]) + cumsum(sum(SIRres$trajectory[SIRres$trajectory[,1]!=0,3]))))
+                         infected = c(sum(SIRres$trajectory[SIRres$trajectory[,1]==0,3]), sum(SIRres$trajectory[SIRres$trajectory[,1]==0,3]) + cumsum(SIRres$trajectory[SIRres$trajectory[,1]!=0,3])),
+                         simnum = 0)
 
-trajecs.gg <- ggplot(data = trajecs, aes(x = time, y = infected, colour = simnum)) + geom_line(alpha=0.1) + geom_line(data = truetrajec, aes(x = time, y = infected),size = 1, colour = "red") + theme_bw()
-
-
+trajecs.gg <- ggplot(data = trajecs, aes(x = time, y = infected, group = simnum)) + geom_line(alpha = 0.1) + geom_line(data = truetrajec, aes(x = time, y = infected),colour="red", size = 1) + 
+    geom_boxplot(data = samples, aes(x=time, y=sampled, group= time),outlier.shape=NA) + geom_point(data=data.frame(dat,simnum=0), aes(x=time,y=Observed),size=4,colour="blue") + theme_bw()
 
 # Simulate data, first for the case where we observe without error ----------------------------------------------
 
