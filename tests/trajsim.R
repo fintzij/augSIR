@@ -119,7 +119,9 @@ for(k in 2:niter){
         X.new <- updateX(X.cur,path.new,subjects[j]); path.new <- getpath(X.new,subjects[j])
         
         if(max(cumsum(X.new[,3])) == pathirm.cur[4,4,dim(pathirm.cur)[3]]){
+
             new.numinf <- pathirm.cur[4,4,dim(pathirm.cur)[3]]+1
+
             pathirm.cur <- update_irm(irm = pathirm.cur, new.numinf = new.numinf, b = Beta[k-1], m = Mu[k-1], a = Alpha[k-1], popsize = popsize)
             patheigen.cur <- update_eigen(patheigen = patheigen.cur, pathirm = pathirm.cur)
         } 
@@ -167,8 +169,7 @@ for(k in 2:niter){
     
     if(loglik[k]==0) keep.going <- FALSE
     
-    if(keep.going == FALSE) break
-    
+    if(keep.going == FALSE) break    
 }
 
 results2 <- list(Beta = Beta, Mu = Mu, loglik = loglik, trajectories = trajectories) 
