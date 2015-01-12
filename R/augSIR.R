@@ -8,7 +8,7 @@
 
 drawpath <- function(Xt, Xother, irm, tmax){
     path <- c(0,0)
-    changetimes <- which(diff(Xt[,2]) != 0)
+    changetimes <- which(diff(Xt[,2], lag = 1) != 0)
     
     if(length(changetimes)==0){
         if(all(Xt[,2]==2)){
@@ -117,7 +117,7 @@ drawtime <- function(Xother, irm, t0, t1, currentstate){
                 if(length(timeseq)!=2) {
                     
                     intervalprobs <- rep(0,length(timeseq)-1)
-                    timediffs <- diff(timeseq)
+                    timediffs <- diff(timeseq, lag = 1)
                     indstart <- sum(times<=timeseq[1]); indend <- sum(times<=timeseq[length(timeseq)-1])
                     totalprob <- 1 - exp(-sum(irm[1, 2,match(numinf[indstart:indend], irm[4,4,])]*timediffs))
                     
@@ -206,7 +206,6 @@ fwd <- function(Xother, W, irm, irm.eig, initdist, p){
             emit <- dbinom(numinf.obs, min(numinf.aug, numinf.obs) +c(0,1,0),p)
             
         } else if(p!=1){
-            #### check this with Vladimir. the emission probability in the recovered state may depend on previous and future infection status
             emit <- dbinom(numinf.obs, numinf.aug +c(0,1,0),p)
             
         }
@@ -442,7 +441,7 @@ getpath <- function(X, j) {
 
 calc_loglike <- function(X, W, irm, b, m, a=0, p, initdist, popsize){
     initinfec <- sum(X[,3][X[,1]==0])
-    Xobs <- rbind(c(0,0,initinfec), X[X[,1]!=0,]); timediffs <- diff(unique(c(0,X[,1])))
+    Xobs <- rbind(c(0,0,initinfec), X[X[,1]!=0,]); timediffs <- diff(unique(c(0,X[,1])), lag = 1)
     events <- ifelse(Xobs[Xobs[,1]!=0,3]==1, 1,2); rates <- ifelse(events==1,irm[1,2,], irm[2,3,])
     
     dbinom(sum(W[,2]), sum(W[,3]), prob=p, log=TRUE) + dmultinom(c(popsize - initinfec, initinfec, 0), prob = initdist, log=TRUE) + sum(log(rates)) - sum(rates*timediffs)
@@ -461,13 +460,13 @@ pop_prob <- function(X, irm, initdist, popsize){
         
         rates <- pmax(0,rates)
         
-        dmultinom(c(popsize - init.infec, init.infec, 0), prob = initdist, log=TRUE) + sum(log(rates)) - sum(rates*diff(Xobs[,1]))
+        dmultinom(c(popsize - init.infec, init.infec, 0), prob = initdist, log=TRUE) + sum(log(rates)) - sum(rates*diff(Xobs[,1], lag = 1))
 
 }
 
 
 path_prob <- function(path, Xother, pathirm, initdist, tmax){
-    times <- c(unique(c(0,Xother[,1])), tmax); timediffs <- diff(times)
+    times <- c(unique(c(0,Xother[,1])), tmax); timediffs <- diff(times, lag = 1)
     init.infec <- sum(Xother[,3]==1 & Xother[,1]==0); numinf <- c(init.infec, init.infec + cumsum(Xother[Xother[,1]!=0,3]))
     
     if(all(path==0)){ # no infection observed
@@ -524,32 +523,43 @@ path_prob <- function(path, Xother, pathirm, initdist, tmax){
 }
 
 # Functions to update parameters
-update_beta <- function(X.cur, beta.prior, popsize){
-    X <- X.cur[X.cur[,1]!=0,]
+update_rates <- function(X.cur, beta.prior, mu.prior, alpha.prior = NULL, popsize){
+    initinfec <- sum(X.cur[,3][X.cur[,1]==0])
+    Xobs <- rbind(c(0,0,initinfec), X.cur[X.cur[,1]!=0,]); indend <- dim(Xobs)[1]
     
-    init.infec <- sum(X.cur[,1] == 0 & X.cur[,3]==1); infections <- X[,3] == 1; 
-    numsick <- c(init.infec, init.infec + cumsum(X[,3])); numsusc <- popsize - cumsum(c(init.infec,X[,3]==1)) 
-    timediffs <- diff(c(0,X[,1]))
+    infections <- Xobs[2:indend,3] == 1; recoveries <- Xobs[2:indend, 3] == -1
     
-    rgamma(1, shape = (beta.prior[1] + sum(infections)), 
-           rate = beta.prior[2] + sum(numsick[1:(length(numsick)-1)] * numsusc[1:(length(numsusc) - 1)] * timediffs * infections))
+    numsick <- cumsum(Xobs[,3])[1:(indend - 1)]; numsusc <- popsize - cumsum(Xobs[1:(indend-1),3]>0) 
+    timediffs <- diff(Xobs[,1], lag = 1)
+    
+    beta.new <- rgamma(1, shape = (beta.prior[1] + sum(infections)), 
+                    rate = beta.prior[2] + sum(numsick * numsusc * timediffs * infections))
+    
+    mu.new <- rgamma(1, shape = (mu.prior[1] + sum(recoveries)), 
+                    rate = mu.prior[2] + sum(numsick * timediffs * recoveries))
+    
+    params.new <- c(beta.new, mu.new,0)
+    
+    if(!is.null(alpha.prior)){
+        alpha.new <- rgamma(1, shape = (alpha.prior[1] + sum(infections)), 
+                            rate = alpha.prior[2] + sum(numsusc * timediffs))
+        
+        params.new[3] <- alpha.new
+    }
+    
+    return(params.new)
 }
 
-update_mu <- function(X.cur, mu.prior, popsize){
-    X <- X.cur[X.cur[,1]!=0,]
-    
-    init.infec <- sum(X.cur[,1] == 0 & X.cur[,3]==1); recoveries <- X[,3] == -1
-    numsick <- c(init.infec, init.infec + cumsum(X[,3]))
-    timediffs <- diff(c(0,X[,1]), lag = 1)
-    
-    rgamma(1, shape = (mu.prior[1] + sum(recoveries)), 
-           rate = mu.prior[2] + sum(numsick[1:(length(numsick)-1)] * timediffs * recoveries))
-    
-}
+
 
 update_alpha <- function(X.cur, alpha.prior, popsize){
     rgamma(1, shape = (alpha.prior[1] + sum(X.cur[,3]==1)),
            rate = alpha.prior[2] + sum((popsize - cumsum(X.cur[,3]==1))*c(0,X.cur[2:dim(X.cur)[1],1] - X.cur[1:(dim(X.cur)[1]-1),1])*(X.cur[,3]==1)))
+}
+
+update_prob <- function(W.cur, p.prior){
+    rbeta(1,p.prior[1] + sum(W.cur[,2]), p.prior[2] + sum(W.cur[,3]-W.cur[,2]))
+    
 }
 
 # accept_prob calculates the acceptance ratio for the M-H algorithm
@@ -612,7 +622,8 @@ find.rateprior <- function(mu, sigmasq, inits){
 
 # augSIR is the wrapper to estimate SIR epidemic parameters via Bayesian data augmentation
 
-augSIR <- function(dat, sim.settings, priors, inits) {
+augSIR <- function(dat, sim.settings, priors, inits, returnX = FALSE) {
+    
     # initialize simulation settings
     popsize <- sim.settings$popsize # size of the population; 
     tmax <- sim.settings$tmax # maximum time of observation
@@ -646,6 +657,11 @@ augSIR <- function(dat, sim.settings, priors, inits) {
     
     # update observation matrix
     W.cur <- updateW(W.cur,X.cur)
+    
+    if(returnX == TRUE) {
+        trajectories <- list(length = niter)
+        trajectories[[1]] <- X.cur
+    }
     
     if(!checkpossible(X=X.cur, W=W.cur)) {
         while(!checkpossible(X=X.cur,W=W.cur)){
@@ -703,33 +719,62 @@ augSIR <- function(dat, sim.settings, priors, inits) {
             
         }
         
-        # draw new binomial sampling probability parameter
-        probs[k] <- rbeta(1,p.prior[1] + sum(W.cur[,2]), p.prior[2] + sum(W.cur[,3]-W.cur[,2]))
+        # draw new parameters
+        probs[k] <- update_prob(W.cur = W.cur, p.prior = p.prior)
         
-        # draw new rate parameters 
-        Beta[k] <- update_beta(X.cur = X.cur, beta.prior = beta.prior, popsize = popsize)
+        # new rate parameters 
+        params.new <- update_rates(X.cur = X.cur, beta.prior = beta.prior, mu.prior = mu.prior, popsize = popsize)
+        Beta[k] <- params.new[1]
         
-        Mu[k] <- update_mu(X.cur = X.cur, mu.prior = mu.prior)
-        
-        #   Alpha[k] <- update_alpha(X.cur = X.cur, alpha.prior = alpha.prior, popsize = popsize)
-        
-        Alpha[k] <- 0
+        Mu[k] <- params.new[2]
+                
+        Alpha[k] <- params.new[3]
         
         loglik[k] <- calc_loglike(X = X.cur, W = W.cur, irm = popirm.cur, b = Beta[k], m = Mu[k], a = Alpha[k], p = probs[k], initdist = initdist, popsize = popsize)  
         
-        #   trajectories <- data.frame(X); epidemic <- data.frame(W)
-        #   trajectories$id <- factor(trajectories$id, levels = unique(as.factor(trajectories$id)))
-        #   trajectories$event <- factor(trajectories$event)
-        #   trajects <- ggplot(subset(trajectories,time!=0),aes(y=id,x=time,group=id,colour=as.factor(event))) + geom_point()+ geom_line() + geom_vline(xintercept = data.frame(W)$time,alpha=0.2)+
-        #     scale_colour_discrete(name="Event", labels=c("Infection Cleared", "Infection Acquired"))
-        #   
-        #   curve <- ggplot(epidemic,aes(x=time,y=augmented))+geom_line() + theme_bw()
-        #   
-        #   print(grid.arrange(trajects, curve, ncol=2))
+        if(returnX == TRUE) {
+            trajectories[[k]] <- X.cur
+        }
         
     }
     
-    results <- list(Beta = Beta, Mu = Mu, loglik = loglik)
+    if(returnX == FALSE){
+        results <- list(Beta = Beta, Mu = Mu, loglik = loglik)
+        
+    } else if(returnX == TRUE){
+        results <- list(Beta = Beta, Mu = Mu, loglik = loglik, trajectories)
+        
+    }
+    
     return(results)
     
 }
+
+
+
+# Deprecated functions ----------------------------------------------------
+
+# update_beta <- function(X.cur, beta.prior, popsize){
+#     initinfec <- sum(X.cur[,3][X.cur[,1]==0])
+#     Xobs <- rbind(c(0,0,initinfec), X.cur[X.cur[,1]!=0,]); indend <- dim(Xobs)[1]
+#     
+#     infections <- Xobs[2:indend,3]==1
+#     
+#     numsick <- cumsum(Xobs[,3])[1:(indend - 1)]; numsusc <- popsize - cumsum(Xobs[1:(indend-1),3]>0) 
+#     timediffs <- diff(Xobs[,1], lag = 1)
+#     
+#     rgamma(1, shape = (beta.prior[1] + sum(infections)), 
+#            rate = beta.prior[2] + sum(numsick * numsusc * timediffs * infections))
+# }
+
+# update_mu <- function(X.cur, mu.prior, popsize){
+#     X <- X.cur[X.cur[,1]!=0,]
+#     
+#     init.infec <- sum(X.cur[,1] == 0 & X.cur[,3]==1); recoveries <- X[,3] == -1
+#     numsick <- c(init.infec, init.infec + cumsum(X[,3]))
+#     timediffs <- diff(c(0,X[,1]), lag = 1)
+#     
+#     rgamma(1, shape = (mu.prior[1] + sum(recoveries)), 
+#            rate = mu.prior[2] + sum(numsick * timediffs * recoveries))
+#     
+# }
