@@ -11,11 +11,11 @@
 # 
 # ggplot(dat.m, aes(x=time, y=value, colour=variable)) + geom_point() + theme_bw()
 
-SIRres<-SIRsim(popsize = 200, S0 = 199, I0 = 1, b = 0.01, mu=.5, a=0, tmax = 20, censusInterval=.25, sampprob = 0.25, returnX = TRUE)
+SIRres<-SIRsim(popsize = 200, S0 = 190, I0 = 10, b = 0.1, mu=.5, a=0, tmax = 200, censusInterval=.25, sampprob = 0.25, returnX = TRUE)
 
 if(dim(SIRres$results)[1] < 10){
     while(dim(SIRres$results)[1] < 10){
-        SIRres<-SIRsim(popsize = 200, S0 = 199, I0 = 1, b = 0.01, mu=.5, a=0, tmax = 20, censusInterval=.25, sampprob = 0.25, returnX = TRUE)
+        SIRres<-SIRsim(popsize = 200, S0 = 198, I0 = 10, b = 0.1, mu=.5, a=0, tmax = 200, censusInterval=.25, sampprob = 0.25, returnX = TRUE)
         
     }
 }

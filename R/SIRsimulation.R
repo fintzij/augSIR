@@ -1,7 +1,7 @@
 # SIRsim simulates an SIR epidemic
 
-h1 <- function(alpha, b, St, It){
-  (b*It + alpha)*St
+h1 <- function(a, b, St, It){
+  (b*It + a)*St
 }
 
 h2 <- function(mu, It){
@@ -26,12 +26,21 @@ SIRsim <- function(popsize, S0, I0, b, mu, a=0, tmax, censusInterval, sampprob, 
     
     X <- X[order(X[,1],X[,3]),]
     
-    h1t <- h1(a,b,S0,I0) 
-    h2t <- h2(mu,I0)
+    h1t <- h1(a=a,b=b,St=S0,It=I0) 
+    h2t <- h2(mu=mu,It=I0)
     
     keep.going <- TRUE; timenow <- 0
-    which.susc <- (I0 + 1):popsize; which.inf <- 1:I0
+
+    if(I0 != popsize){
+        which.susc <- (I0+1):popsize
+    } else {
+        which.susc <- 0
+    }
+    
+    which.inf <- 1:I0
     infectednow <- I0; susceptiblenow <- S0
+    
+    iTi <- 0
     
     while(keep.going == TRUE){
         rate <- h1t + h2t
@@ -44,11 +53,14 @@ SIRsim <- function(popsize, S0, I0, b, mu, a=0, tmax, censusInterval, sampprob, 
             X[which(X[,2] == which.susc[1])[1],1] <- ifelse(timenow <= tmax, timenow, 0)
             X[which(X[,2] == which.susc[1])[1],3] <- ifelse(timenow <= tmax, 1, 0)
             
-            h1t <- h1(a, b, susceptiblenow, infectednow); h2t <- h2(mu, infectednow)
+            h1t <- h1(a=a, b=b, St=susceptiblenow, It=infectednow); h2t <- h2(mu=mu, It=infectednow)
             which.inf <- c(which.inf, which.susc[1]); which.susc <- which.susc[-1]; 
             X <- X[order(X[,1],X[,3]),]
             
         } else if(p>probs[1]){ # recovery happens
+            
+            iTi <- iTi + tau*infectednow
+            
             timenow <- timenow + tau; infectednow <- infectednow - 1; susceptiblenow <- susceptiblenow
 #             durations <- timenow - X[X[,3]!=0 & X[,2] %in% which.inf, 1]; durations <- cumsum(durations)/sum(durations)
 #             
@@ -57,11 +69,11 @@ SIRsim <- function(popsize, S0, I0, b, mu, a=0, tmax, censusInterval, sampprob, 
 #             whorecovers <- Position(function(x) x >= draw, durations)
 # 
             whorecovers <- sample(1:length(which.inf),1)
-            
+
             X[which(X[,2] == which.inf[whorecovers])[1],1] <- ifelse(timenow <= tmax, timenow, 0)
             X[which(X[,2] == which.inf[whorecovers])[1],3] <- ifelse(timenow <= tmax, -1, 0)
             
-            h1t <- h1(a, b, susceptiblenow, infectednow); h2t <- h2(mu, infectednow)
+            h1t <- h1(a=a, b=b, St=susceptiblenow, It=infectednow); h2t <- h2(mu=mu, It=infectednow)
             which.inf <- which.inf[-whorecovers]
             X <- X[order(X[,1],X[,3]),]
         }
@@ -107,9 +119,8 @@ SIRsim <- function(popsize, S0, I0, b, mu, a=0, tmax, censusInterval, sampprob, 
     if(returnX == FALSE){
         return(SIRres)
     } else {
-        return(list(results = SIRres, trajectory = X))
+        return(list(results = SIRres, trajectory = X, iTi= iTi))
     }
-        
 }
 
 

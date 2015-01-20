@@ -533,10 +533,10 @@ update_rates <- function(X.cur, beta.prior, mu.prior, alpha.prior = NULL, popsiz
     timediffs <- diff(Xobs[,1], lag = 1)
     
     beta.new <- rgamma(1, shape = (beta.prior[1] + sum(infections)), 
-                    rate = beta.prior[2] + sum(numsick * numsusc * timediffs * infections))
+                    rate = beta.prior[2] + sum(numsick * numsusc * timediffs))
     
     mu.new <- rgamma(1, shape = (mu.prior[1] + sum(recoveries)), 
-                    rate = mu.prior[2] + sum(numsick * timediffs * recoveries))
+                    rate = mu.prior[2] + sum(numsick * timediffs))
     
     params.new <- c(beta.new, mu.new,0)
     
