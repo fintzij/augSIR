@@ -442,9 +442,9 @@ getpath <- function(X, j) {
 calc_loglike <- function(X, W, irm, b, m, a=0, p, initdist, popsize){
     initinfec <- sum(X[,3][X[,1]==0])
     Xobs <- rbind(c(0,0,initinfec), X[X[,1]!=0,]); timediffs <- diff(unique(c(0,X[,1])), lag = 1)
-    events <- ifelse(Xobs[Xobs[,1]!=0,3]==1, 1,2); rates <- ifelse(events==1,irm[1,2,], irm[2,3,])
+    events <- ifelse(Xobs[Xobs[,1]!=0,3]==1, 1,2); rates <- ifelse(events==1,irm[1,2,], irm[2,3,]); hazards <-as.vector(irm[1,2,]) + as.vector(irm[2,3,]) 
     
-    dbinom(sum(W[,2]), sum(W[,3]), prob=p, log=TRUE) + dmultinom(c(popsize - initinfec, initinfec, 0), prob = initdist, log=TRUE) + sum(log(rates)) - sum(rates*timediffs)
+    dbinom(sum(W[,2]), sum(W[,3]), prob=p, log=TRUE) + dmultinom(c(popsize - initinfec, initinfec, 0), prob = initdist, log=TRUE) + sum(log(rates)) - sum(hazards*timediffs)
 } 
 
 # pop_prob and path_prob calculate the log-probabilities of the population trajectory and the subject trajectory for use in the M-H ratio
@@ -453,14 +453,12 @@ pop_prob <- function(X, irm, initdist, popsize){
 
         Xobs <- rbind(c(0,0,sum(X[X[,1]==0,3])), X[X[,1]!=0,])
         init.infec <- sum(X[,3]==1 & X[,1]==0)
-        events <- ifelse(Xobs[Xobs[,1]!=0,3]==1, 1,2); rates <- ifelse(events==1,irm[1,2,], irm[2,3,])
+        events <- ifelse(Xobs[Xobs[,1]!=0,3]==1, 1,2) 
+        rates <- ifelse(events==1,irm[1,2,], irm[2,3,]); rates <- pmax(0,rates)
+
+        hazards <- as.vector(irm[1,2,]) + as.vector(irm[2,3,])        
         
-        # note that it is possible to have an impossible trajectory proposed if the infection is depleted between time 0 and the first observation time, but there are still enough
-        # augmented infections by the first observation time (this is the first time for which an emission probability is computed). Therefore, rates are set to max(0, rates)
-        
-        rates <- pmax(0,rates)
-        
-        dmultinom(c(popsize - init.infec, init.infec, 0), prob = initdist, log=TRUE) + sum(log(rates)) - sum(rates*diff(Xobs[,1], lag = 1))
+        dmultinom(c(popsize - init.infec, init.infec, 0), prob = initdist, log=TRUE) + sum(log(rates)) - sum(hazards*diff(Xobs[,1], lag = 1))
 
 }
 
@@ -742,7 +740,7 @@ augSIR <- function(dat, sim.settings, priors, inits, returnX = FALSE) {
         results <- list(Beta = Beta, Mu = Mu, loglik = loglik)
         
     } else if(returnX == TRUE){
-        results <- list(Beta = Beta, Mu = Mu, loglik = loglik, trajectories)
+        results <- list(Beta = Beta, Mu = Mu, loglik = loglik, trajectories=trajectories)
         
     }
     
