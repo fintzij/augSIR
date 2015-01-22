@@ -11,11 +11,11 @@
 # 
 # ggplot(dat.m, aes(x=time, y=value, colour=variable)) + geom_point() + theme_bw()
 
-SIRres<-SIRsim(popsize = 200, S0 = 190, I0 = 10, b = 0.01, mu=.5, a=0, tmax = 200, censusInterval=.1, sampprob = 0.25, returnX = TRUE)
+SIRres<-SIRsim(popsize = 200, S0 = 199, I0 = 1, b = 0.01, mu=.5, a=0, tmax = 200, censusInterval=.1, sampprob = 0.25, returnX = TRUE)
 
 if(dim(SIRres$results)[1] < 10){
     while(dim(SIRres$results)[1] < 10){
-        SIRres<-SIRsim(popsize = 200, S0 = 198, I0 = 10, b = 0.01, mu=.5, a=0, tmax = 200, censusInterval=.1, sampprob = 0.25, returnX = TRUE)
+        SIRres<-SIRsim(popsize = 200, S0 = 199, I0 = 1, b = 0.01, mu=.5, a=0, tmax = 200, censusInterval=.1, sampprob = 0.25, returnX = TRUE)
         
     }
 }
@@ -28,7 +28,7 @@ ggplot(dat.m, aes(x=time, y=value, colour=variable)) + geom_point() + theme_bw()
 
 sim.settings <- list(popsize = 200,
                      tmax = 200,
-                     niter = 200,
+                     niter = 5000,
                      amplify = 5,
                      initdist = c(0.995, 0.005, 0))
 
@@ -153,7 +153,7 @@ for(k in 2:niter){
     
 }
 
-results2 <- list(Beta = Beta, Mu = Mu, loglik = loglik, trajectories = trajectories) 
+results2 <- list(Beta = Beta, Mu = Mu, probs=probs, loglik = loglik, trajectories = trajectories) 
 
 
 # Results for the case with error, p=0.2  -----------------------------------------------------------------
@@ -161,10 +161,10 @@ results2 <- list(Beta = Beta, Mu = Mu, loglik = loglik, trajectories = trajector
 censusInterval <- 0.1; p <- 0.25
 trajectories2 <- list(); observations2 <- list(); likelihoods <- list()
 
-# for(k in 1:(length(results2[[4]]))){
-for(k in 1:(length(trajectories))){
-    if ((k%%1)==0){
-#     traj <- results2[[4]][[k]]
+for(k in 1:(length(results2[[4]]))){
+# for(k in 1:(length(trajectories))){
+    if ((k%%50)==0){
+    traj <- results2[[4]][[k]]
     traj <- trajectories[[k]]
         Xobs <- data.frame(time = unique(traj[,1]), 
                        infected = c(sum(traj[traj[,1]==0,3]),sum(traj[traj[,1]==0,3]) + cumsum(traj[traj[,1]!=0,3])), 

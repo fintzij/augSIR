@@ -324,8 +324,8 @@ obstpm <- function(numinf, eventtimes, irm, irm.eig, t0, t1){
 # controls the factor by which the observed number of infecteds is multiplied to get the number of initialized trajectories (up to the population size)
 # X is matrix with event times, subject id and event codes. 
 # Event codes: 1=carriage aquired, -1=carriage infected, 0=event out of time range
-initializeX <- function(W, mu, p, amplify, tmax, popsize){
-    whichsick <- sample(1:popsize,min(popsize,floor(sum(W[,2])/p)*amplify))
+initializeX <- function(W, b, mu, a, p, amplify, tmax, popsize){
+    whichsick <- 1:min(popsize,floor(sum(W[,2])/p)*amplify); totalinfected <- length(whichsick)
     
     X <- as.matrix(data.frame(time=rep(0,popsize*2), id=rep(1:popsize,each=2), event=rep(0,2*popsize)))
     
@@ -338,7 +338,8 @@ initializeX <- function(W, mu, p, amplify, tmax, popsize){
                     noexcess <- which(W[,3]<=W[,2]); noexcess.times <- W[noexcess,1]
                     keepchoosing <- TRUE
                     while(keepchoosing==TRUE){
-                        proposed <- sample(ids, 1)
+                        durs <- infec_durs(X, ids)
+                        proposed <- sample(ids, 1, prob = durs) # preferentially resample individuals with long infection times for reinitialization
                         proposed.path <- getpath(X, proposed)
                         if(!any(proposed.path[1] < noexcess.times & proposed.path[2]>noexcess.times)){
                             selected[r] <- proposed
@@ -354,7 +355,7 @@ initializeX <- function(W, mu, p, amplify, tmax, popsize){
                 }
                 whichsick <- c(whichsick,selected)
             }
-            if(sum(X[X[,1]<=W[k,1],3]) <= W[k,2]){
+            if(sum(X[X[,1]<=W[k,1],3]) < W[k,2]){
                 nowsick <- sample(whichsick,max(0,W[k,2] - sum(X[X[,1]<=W[k,1],3]))); whichsick <- whichsick[-which(whichsick %in% nowsick)]
                 
                 for(j in 1:length(nowsick)){
@@ -376,10 +377,45 @@ initializeX <- function(W, mu, p, amplify, tmax, popsize){
             } else next          
         }   
     }
+    
+    if(sum(infec_durs(X,1:popsize)!=0) < totalinfected){
+        
+        X<-X[order(X[,1]),]
+        
+        infecs_toadd <- which(infec_durs(X,1:totalinfected)==0)
+        
+        for(s in 1:length(infecs_toadd)){
+            initinfec <- sum(X[,3][X[,1]==0])
+            Xobs <- rbind(c(0,0,initinfec), X[X[,1]!=0,]); indend <- dim(Xobs)[1]
+            
+            infections <- Xobs[2:indend,3] == 1; recoveries <- Xobs[2:indend, 3] == -1
+            
+            numsick <- cumsum(Xobs[,3])[1:(indend - 1)]; numsusc <- popsize - cumsum(Xobs[1:(indend-1),3]>0) 
+            timediffs <- diff(Xobs[,1], lag = 1)
+            
+            irm <- buildirm(X = X, b = b, m = mu, a = a, popsize = popsize, pop = FALSE)
+            
+            path <- c(0,0)
+            path[1] <- drawtime(Xother = X, irm = irm, t0=0, t1=max(X[,1]), currentstate = 1)
+            path[2] <- drawtime(Xother = X, irm = irm, t0 = path[1], t1 = Inf, currentstate = 2)
+            
+            X <- updateX(X, path, infecs_toadd[s])
+        }
+    }
         
     X<-X[order(X[,1]),]
     
     return(X)
+}
+
+# infec_durs retrieves the durations of infections from a matrix X
+infec_durs <- function(X,ids){
+    durs <- rep(0, length = length(ids))
+    for(r in 1:length(durs)){
+        durs[r] <- max(X[X[,2]==ids[r],1]) - min(X[X[,2]==ids[r],1])
+    }
+    
+    return(durs)
 }
 
 # updateW updates an observation matrix. The function takes as arguments an observation matrix with trajectories, X, and a matrix, W, 
