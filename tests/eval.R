@@ -22,19 +22,19 @@ ggplot(dat.m, aes(x=time, y=value, colour=variable)) + geom_point() + theme_bw()
 
 sim.settings <- list(popsize = 200,
                      tmax = 20,
-                     niter = 200,
+                     niter = 50,
                      amplify = 5,
                      initdist = c(0.995, 0.005, 0))
 
 inits <- list(beta.init = 0.01 + runif(1,-0.005, 0.005),
               mu.init = 0.5 + runif(1, -0.05, 0.05),
               alpha.init = 0, 
-              probs.init = 0.2 + runif(1,-0.1, 0.1))
+              probs.init = 0.25 + runif(1,-0.1, 0.1))
 
-priors <- list(beta.prior = c(.012, 1.1),
-               mu.prior = c(0.96, 1.96),
+priors <- list(beta.prior = c(3, 240),
+               mu.prior = c(28, 53),
                alpha.prior = NULL,
-               p.prior = c(0.022, 0.084))
+               p.prior = c(4.5, 13.35))
 
 # run sampler
 
@@ -54,7 +54,7 @@ censusInterval <- 0.25; p <- 0.2
 trajectories <- list(); observations <- list(); likelihoods <- list()
 
 for(k in 1:(length(results[[4]]))){
-    if ((k%%10)==0){
+    if ((k%%1)==0){
         traj <- results[[4]][[k]]
         Xobs <- data.frame(time = unique(traj[,1]), 
                            infected = c(sum(traj[traj[,1]==0,3]),sum(traj[traj[,1]==0,3]) + cumsum(traj[traj[,1]!=0,3])), 

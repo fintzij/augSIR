@@ -11,11 +11,11 @@
 # 
 # ggplot(dat.m, aes(x=time, y=value, colour=variable)) + geom_point() + theme_bw()
 
-SIRres<-SIRsim(popsize = 200, S0 = 190, I0 = 10, b = 0.01, mu=.5, a=0, tmax = 200, censusInterval=.25, sampprob = 0.25, returnX = TRUE)
+SIRres<-SIRsim(popsize = 200, S0 = 190, I0 = 10, b = 0.01, mu=.5, a=0, tmax = 200, censusInterval=.1, sampprob = 0.25, returnX = TRUE)
 
 if(dim(SIRres$results)[1] < 10){
     while(dim(SIRres$results)[1] < 10){
-        SIRres<-SIRsim(popsize = 200, S0 = 198, I0 = 10, b = 0.01, mu=.5, a=0, tmax = 200, censusInterval=.25, sampprob = 0.25, returnX = TRUE)
+        SIRres<-SIRsim(popsize = 200, S0 = 198, I0 = 10, b = 0.01, mu=.5, a=0, tmax = 200, censusInterval=.1, sampprob = 0.25, returnX = TRUE)
         
     }
 }
@@ -35,12 +35,12 @@ sim.settings <- list(popsize = 200,
 inits <- list(beta.init = 0.01 + runif(1,-0.005, 0.005),
               mu.init = 0.5 + runif(1, -0.05, 0.05),
               alpha.init = 0, 
-              probs.init = 0.2 + runif(1,-0.1, 0.1))
+              probs.init = 0.25 + runif(1,-0.05, 0.05))
 
-priors <- list(beta.prior = c(.01, 1),
-               mu.prior = c(1, 2),
+priors <- list(beta.prior = c(.012, 1.1),
+               mu.prior = c(0.96, 1.96),
                alpha.prior = NULL,
-               p.prior = c(0.022, 0.084))
+               p.prior = c(4.5, 13.35))
 
 popsize <- sim.settings$popsize # size of the population; 
 tmax <- sim.settings$tmax # maximum time of observation
@@ -137,10 +137,10 @@ for(k in 2:niter){
     }
         
     # draw new parameters
-    probs[k] <- update_prob(W.cur = W.cur, p.prior = p.prior)
+    probs[k] <- update_prob(W = W.cur, p.prior = p.prior)
     
     # new rate parameters 
-    params.new <- update_rates(X.cur = X.cur, beta.prior = beta.prior, mu.prior = mu.prior, popsize = popsize)
+    params.new <- update_rates(X = X.cur, beta.prior = beta.prior, mu.prior = mu.prior, popsize = popsize)
     Beta[k] <- params.new[1]
     
     Mu[k] <- params.new[2]
@@ -158,13 +158,15 @@ results2 <- list(Beta = Beta, Mu = Mu, loglik = loglik, trajectories = trajector
 
 # Results for the case with error, p=0.2  -----------------------------------------------------------------
 
-censusInterval <- 0.25; p <- 0.2
+censusInterval <- 0.1; p <- 0.25
 trajectories2 <- list(); observations2 <- list(); likelihoods <- list()
 
-for(k in 1:(length(results2[[4]]))){
+# for(k in 1:(length(results2[[4]]))){
+for(k in 1:(length(trajectories))){
     if ((k%%1)==0){
-    traj <- results2[[4]][[k]]
-    Xobs <- data.frame(time = unique(traj[,1]), 
+#     traj <- results2[[4]][[k]]
+    traj <- trajectories[[k]]
+        Xobs <- data.frame(time = unique(traj[,1]), 
                        infected = c(sum(traj[traj[,1]==0,3]),sum(traj[traj[,1]==0,3]) + cumsum(traj[traj[,1]!=0,3])), 
                        simnum = k)
     trajectories2[[k]] <- Xobs
