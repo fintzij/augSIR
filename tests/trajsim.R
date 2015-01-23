@@ -28,7 +28,7 @@ ggplot(dat.m, aes(x=time, y=value, colour=variable)) + geom_point() + theme_bw()
 
 sim.settings <- list(popsize = 200,
                      tmax = 200,
-                     niter = 500,
+                     niter = 2500,
                      amplify = 10,
                      initdist = c(0.995, 0.005, 0))
 
@@ -96,6 +96,7 @@ for(k in 2:niter){
     # Update trajectories
     print(k)
     subjects <- sample(unique(X.cur[,2]),length(unique(X.cur[,2])),replace=TRUE)
+#     subjects <- 1:200
     
     pathirm.cur <- buildirm(X = X.cur, b = Beta[k-1], m = Mu[k-1], a = Alpha[k-1], popsize = popsize, pop = FALSE)
     patheigen.cur <- irm_decomp(pathirm.cur)
@@ -175,12 +176,12 @@ results2 <- list(Beta = Beta, Mu = Mu, probs=probs, loglik = loglik, trajectorie
 
 # Results for the case with error, p=0.2  -----------------------------------------------------------------
 
-censusInterval <- 0.1; p <- 0.25
+censusInterval <- 0.25; p <- 0.25
 trajectories2 <- list(); observations2 <- list(); likelihoods <- list()
 
 for(k in 1:(length(results2[[4]]))){
 # for(k in 1:(length(trajectories))){
-    if ((k%%1)==0){
+    if ((k%%25)==0){
     traj <- results2[[4]][[k]]
     traj <- trajectories[[k]]
         Xobs <- data.frame(time = unique(traj[,1]), 

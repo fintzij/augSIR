@@ -113,7 +113,7 @@ drawtime <- function(Xother, irm, t0, t1, currentstate){
                     timeseq <- c(t0, times[times > t0])
                 }
                 
-                init.infec <- sum(Xother[,3]==1 & Xother[,1]==0)
+                init.infec <- sum(Xother[Xother[,1]==0,3])
                 numinf <- c(init.infec, init.infec + cumsum(Xother[Xother[,1]!=0,3]))
                 
                 if(length(timeseq)!=2) {
@@ -170,16 +170,19 @@ drawXt <- function(Xother, irm, irm.eig, W, p, b, m, a, initdist){
 #fwd produces P_tj from P_t,j-1
 fwd <- function(Xother, W, irm, irm.eig, initdist, p){
     
+    initinfec <- sum(Xother[,3][Xother[,1]==0])
+    Xobs <- rbind(c(0,0,initinfec), Xother[Xother[,1]!=0,]); indend <- dim(Xobs)[1]
+        
+    numsick <- cumsum(Xobs[,3]) 
+    eventtimes <- Xobs[,1]
+    
     Xt.fb <- array(0,dim=c(3,3,dim(W)[1]-1))
     obstimes <- W[,1]
-    
-    eventtimes <- unique(c(0, Xother[,1]))
-    
-    init.infec <- sum(Xother[,3]==1 & Xother[,1]==0); numinf <- c(init.infec, init.infec + cumsum(Xother[Xother[,1]!=0,3]))
-    
-    tpm <- obstpm(numinf = numinf, eventtimes = eventtimes, irm = irm, irm.eig = irm.eig, t0 = obstimes[1], t1 = obstimes[2])
         
-    numinf.aug <- numinf[eventtimes<=obstimes[2]][sum(eventtimes<=obstimes[2])]; numinf.obs <- W[2,2]
+    tpm <- obstpm(numinf = numsick, eventtimes = eventtimes, irm = irm, irm.eig = irm.eig, t0 = obstimes[1], t1 = obstimes[2])
+    
+    ind <- which(Xobs[,1] <= obstimes[2])[sum(Xobs[,1] <= obstimes[2])]
+    numinf.aug <- numsick[ind]; numinf.obs <- W[2,2]
     
     if(p!=1){
         emit <- dbinom(numinf.obs, numinf.aug +c(0,1,0),p) 
@@ -192,11 +195,12 @@ fwd <- function(Xother, W, irm, irm.eig, initdist, p){
     Xt.fb[,,1]<-normalize(outer(initdist,emit,FUN="*")*tpm)
 
     for(k in 2:dim(Xt.fb)[3]){
-        tpm <- obstpm(numinf = numinf, eventtimes = eventtimes, irm = irm, irm.eig = irm.eig, t0 = obstimes[k], t1 = obstimes[k+1])
+        tpm <- obstpm(numinf = numsick, eventtimes = eventtimes, irm = irm, irm.eig = irm.eig, t0 = obstimes[k], t1 = obstimes[k+1])
         
         distr <- colSums(Xt.fb[,,k-1])
         
-        numinf.aug <- numinf[eventtimes <= obstimes[k+1]][sum(eventtimes <= obstimes[k+1])]; numinf.obs <- W[W[,1]==obstimes[k+1],2]
+        ind <- which(Xobs[,1] <= obstimes[k+1])[sum(Xobs[,1] <= obstimes[k+1])]
+        numinf.aug <- numsick[ind]; numinf.obs <- W[k+1,2]
         
         if(p==1){
             emit <- dbinom(numinf.obs, min(numinf.aug, numinf.obs) +c(0,1,0),p)
@@ -313,7 +317,9 @@ obstpm <- function(numinf, eventtimes, irm, irm.eig, t0, t1){
     tpm <- diag(1,3) 
     
     for (j in 1:(length(timeseq)-1)) {
-        ind <- match(numinf[eventtimes <= timeseq[j]][sum(eventtimes <= timeseq[j])], irm[4,4,])
+        ind.sick <- which(eventtimes <= timeseq[j])[sum(eventtimes <= timeseq[j])]
+        
+        ind <- match(numinf[ind.sick], irm[4,4,])
             
         tpm <- tpm %*% buildtpm(values = irm.eig[,,1,ind],
                                 vectors = irm.eig[,,2,ind],
