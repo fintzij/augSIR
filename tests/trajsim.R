@@ -11,11 +11,11 @@
 # 
 # ggplot(dat.m, aes(x=time, y=value, colour=variable)) + geom_point() + theme_bw()
 
-SIRres<-SIRsim(popsize = 200, S0 = 199, I0 = 1, b = 0.01, mu=.5, a=0, tmax = 200, censusInterval=.1, sampprob = 0.25, returnX = TRUE)
+SIRres<-SIRsim(popsize = 200, S0 = 199, I0 = 1, b = 0.01, mu=.5, a=0, tmax = 200, censusInterval=.25, sampprob = 0.25, returnX = TRUE)
 
 if(dim(SIRres$results)[1] < 10){
     while(dim(SIRres$results)[1] < 10){
-        SIRres<-SIRsim(popsize = 200, S0 = 199, I0 = 1, b = 0.01, mu=.5, a=0, tmax = 200, censusInterval=.1, sampprob = 0.25, returnX = TRUE)
+        SIRres<-SIRsim(popsize = 200, S0 = 199, I0 = 1, b = 0.01, mu=.5, a=0, tmax = 200, censusInterval=.25, sampprob = 0.25, returnX = TRUE)
         
     }
 }
@@ -28,8 +28,8 @@ ggplot(dat.m, aes(x=time, y=value, colour=variable)) + geom_point() + theme_bw()
 
 sim.settings <- list(popsize = 200,
                      tmax = 200,
-                     niter = 5000,
-                     amplify = 5,
+                     niter = 500,
+                     amplify = 10,
                      initdist = c(0.995, 0.005, 0))
 
 inits <- list(beta.init = 0.01 + runif(1,-0.005, 0.005),
@@ -73,14 +73,15 @@ W.cur <- as.matrix(data.frame(time = dat$time, sampled = dat$Observed, augmented
 # Event codes: 1=carriage aquired, -1=carriage infected, 0=event out of time range
 X.cur <- as.matrix(data.frame(time=rep(0,popsize*2), id=rep(1:popsize,each=2), event=rep(0,2*popsize)))
 
-X.cur <- initializeX(W = W.cur, mu = Mu[1], p=probs[1], amplify = amplify, tmax=20, popsize = popsize)
+X.cur <- SIRres$trajectory
+# X.cur <- initializeX(W = W.cur, b = Beta[1], mu = Mu[1], a = Alpha[1], p=probs[1], amplify = amplify, tmax=20, popsize = popsize)
 
 # update observation matrix
 W.cur <- updateW(W.cur,X.cur)
 
 if(!checkpossible(X=X.cur, W=W.cur)) {
     while(!checkpossible(X=X.cur,W=W.cur)){
-        X.cur <- initializeX(W = W.cur, mu = Mu[1], p=probs[1], amplify = amplify, tmax=20, popsize = popsize)
+        X.cur <- initializeX(W = W.cur, b = Beta[1], mu = Mu[1], a = Alpha[1], p=probs[1], amplify = amplify, tmax=20, popsize = popsize)
         W.cur <- updateW(W.cur,X.cur)
     }
 }
@@ -106,7 +107,23 @@ for(k in 2:niter){
         
         W.other <-updateW(W.cur, Xother)
         Xt <- drawXt(Xother = Xother, irm = pathirm.cur, irm.eig = patheigen.cur, W=W.other, p=probs[k-1], b=Beta[k-1], m=Mu[k-1], a=Alpha[k-1], initdist = initdist)
-                
+             
+#         durs <- rep(0,200)
+#         for(s in 1:200){
+#             Xt <- drawXt(Xother = Xother, irm = pathirm.cur, irm.eig = patheigen.cur, W=W.other, p=probs[k-1], b=Beta[k-1], m=Mu[k-1], a=Alpha[k-1], initdist = initdist)
+#             path <- drawpath(Xt,Xother, pathirm.cur, tmax)
+#             
+#             durs[s] <- path[2]-path[1]
+#             
+#             if(all(path==Inf)) durs[s] <- 0
+#             
+#             if(is.nan(durs[s])) stop()
+#         }
+#         
+#         durations[j] <- mean(durs[durs<Inf])
+#         
+#         if(is.na(durations[j])) stop()
+        
         path.new<- drawpath(Xt, Xother, pathirm.cur, tmax)
         
         X.new <- updateX(X.cur,path.new,subjects[j]); path.new <- getpath(X.new,subjects[j])
@@ -163,7 +180,7 @@ trajectories2 <- list(); observations2 <- list(); likelihoods <- list()
 
 for(k in 1:(length(results2[[4]]))){
 # for(k in 1:(length(trajectories))){
-    if ((k%%50)==0){
+    if ((k%%1)==0){
     traj <- results2[[4]][[k]]
     traj <- trajectories[[k]]
         Xobs <- data.frame(time = unique(traj[,1]), 
