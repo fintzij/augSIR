@@ -154,13 +154,13 @@ drawtime <- function(Xother, irm, t0, t1, currentstate){
 # p, is the sampling probability, and b, and m are the epidemiologic parameters. initdist is the initial
 # distribution for infection status
 
-drawXt <- function(Xother, irm, irm.eig, W, p, b, m, a, initdist){
+drawXt <- function(Xother, irm, irm.eig, W, p, initdist){
     
     Xt <- cbind(W[,1], 0)
     
-    Xt.fb <- fwd(Xother, W, irm, irm.eig, initdist, p)
+    Xt.fb <- fwd(Xother = Xother, W = W, irm = irm, irm.eig = irm.eig, initdist = initdist, p = p)
     
-    Xt<-bwd(Xt.fb,Xt)
+    Xt<-bwd(Xt.fb = Xt.fb, Xt = Xt)
         
     return(Xt)
 }
@@ -185,10 +185,10 @@ fwd <- function(Xother, W, irm, irm.eig, initdist, p){
     numinf.aug <- numsick[ind]; numinf.obs <- W[2,2]
     
     if(p!=1){
-        emit <- dbinom(numinf.obs, numinf.aug +c(0,1,0),p) 
+        emit <- dbinom(x = numinf.obs, size = (numinf.aug +c(0,1,0)), prob = p) 
         
     } else if(p==1){
-        emit <- dbinom(numinf.obs, min(numinf.aug, numinf.obs) +c(0,1,0),p)
+        emit <- dbinom(x = numinf.obs, size = (min(numinf.aug, numinf.obs) +c(0,1,0)), prob = p)
         
     }
     
@@ -505,12 +505,15 @@ pop_prob <- function(X, irm, initdist, popsize){
 
 
 path_prob <- function(path, Xother, pathirm, initdist, tmax){
-    times <- c(unique(c(0,Xother[,1])), tmax); timediffs <- diff(times, lag = 1)
-    init.infec <- sum(Xother[Xother[,1]==0,3]); numinf <- c(init.infec, init.infec + cumsum(Xother[Xother[,1]!=0,3]))
+    init.infec <- sum(Xother[Xother[,1]==0,3]==1)
+    Xobs <- rbind(c(0,0,init.infec), Xother[Xother[,1]!=0,]); indend <- dim(Xobs)[1]
+    
+    times <- Xobs[,1]; timediffs <- diff(times, lag = 1)
+    numinf <- cumsum(Xobs[,3])
     
     if(all(path==0)){ # no infection observed
                 
-        path.prob <- log(initdist[1])-sum(pathirm[1, 2, match(numinf,pathirm[4,4,])] * timediffs)
+        path.prob <- log(initdist[1])-sum(pathirm[1, 2, match(numinf[1:(indend - 1)],pathirm[4,4,])] * timediffs)
             
     } else if(path[2] > 0 & path[2] < Inf) { # subject is infected and recovery is observed
         
@@ -669,6 +672,7 @@ augSIR <- function(dat, sim.settings, priors, inits, returnX = FALSE) {
     Mu <- vector(length = niter); Mu[1] <- inits$mu.init
     Alpha <- vector(length = niter); Alpha[1] <- inits$alpha.init 
     probs <- vector(length = niter); probs[1] <- inits$probs.init
+    accepts <- vector(length = (niter - 1))
     
     # vectors for parameters of distributions for beta, mu, and p. beta and mu have gamma distributions, p has beta distribution.
     beta.prior <- priors$beta.prior
@@ -689,7 +693,7 @@ augSIR <- function(dat, sim.settings, priors, inits, returnX = FALSE) {
     X.cur <- initializeX(W = W.cur, b = Beta[1], mu = Mu[1], a = Alpha[1], p=probs[1], amplify = amplify, tmax=20, popsize = popsize)
     
     # update observation matrix
-    W.cur <- updateW(W.cur,X.cur)
+    W.cur <- updateW(W = W.cur, X = X.cur)
     
     if(returnX == TRUE) {
         trajectories <- list(length = niter)
@@ -712,8 +716,10 @@ augSIR <- function(dat, sim.settings, priors, inits, returnX = FALSE) {
         print(k)
         subjects <- sample(unique(X.cur[,2]),length(unique(X.cur[,2])),replace=TRUE)
         
-        pathirm.cur <- buildirm(X.cur, b = Beta[k-1], m = Mu[k-1], a = Alpha[k-1], popsize = popsize, pop = FALSE)
-        patheigen.cur <- irm_decomp(pathirm.cur)
+        pathirm.cur <- buildirm(X = X.cur, b = Beta[k-1], m = Mu[k-1], a = Alpha[k-1], popsize = popsize, pop = FALSE)
+        patheigen.cur <- irm_decomp(pathirm.cur = pathirm.cur)
+        
+        accepts.k <- 0
         
         for(j in 1:length(subjects)){
             print(j)
@@ -722,11 +728,11 @@ augSIR <- function(dat, sim.settings, priors, inits, returnX = FALSE) {
             path.cur <- getpath(X.cur, subjects[j])
             
             W.other <-updateW(W.cur, Xother)
-            Xt <- drawXt(Xother = Xother, irm = pathirm.cur, irm.eig = patheigen.cur, W=W.other, p=probs[k-1], b=Beta[k-1], m=Mu[k-1], a=Alpha[k-1], initdist = initdist)
+            Xt <- drawXt(Xother = Xother, irm = pathirm.cur, irm.eig = patheigen.cur, W=W.other, p=probs[k-1], initdist = initdist)
             
-            path.new<- drawpath(Xt, Xother, pathirm.cur, tmax)
+            path.new<- drawpath(Xt = Xt, Xother = Xother, irm = pathirm.cur, tmax = tmax)
             
-            X.new <- updateX(X.cur,path.new,subjects[j]); path.new <- getpath(X.new,subjects[j])
+            X.new <- updateX(X = X.cur, Xt.path = path.new, j = subjects[j]); path.new <- getpath(X = X.new, j = subjects[j])
             
             if(max(cumsum(X.new[,3])) == pathirm.cur[4,4,dim(pathirm.cur)[3]]){
 
@@ -734,13 +740,14 @@ augSIR <- function(dat, sim.settings, priors, inits, returnX = FALSE) {
 
                 pathirm.cur <- update_irm(irm = pathirm.cur, new.numinf = new.numinf, b = Beta[k-1], m = Mu[k-1], a = Alpha[k-1], popsize = popsize)
                 patheigen.cur <- update_eigen(patheigen = patheigen.cur, pathirm = pathirm.cur)
+                
             } 
 
             popirm.new <- buildirm(X = X.new, b = Beta[k-1], m = Mu[k-1], a = Alpha[k-1], popsize = popsize, pop = TRUE)
             pop_prob.new <- pop_prob(X = X.new, irm = popirm.new, initdist = initdist, popsize = popsize)
 
-            path_prob.new <- path_prob(path.new, Xother, pathirm.cur, initdist, tmax)
-            path_prob.cur <- path_prob(path.cur, Xother, pathirm.cur, initdist, tmax)
+            path_prob.new <- path_prob(path = path.new, Xother = Xother, pathirm = pathirm.cur, initdist = initdist, tmax = tmax)
+            path_prob.cur <- path_prob(path = path.cur, Xother = Xother, pathirm = pathirm.cur, initdist = initdist, tmax = tmax)
             
             a.prob <- accept_prob(pop_prob.new, pop_prob.cur, path_prob.cur, path_prob.new)
             
@@ -749,9 +756,13 @@ augSIR <- function(dat, sim.settings, priors, inits, returnX = FALSE) {
                 W.cur <- updateW(W.cur,X.new)
                 popirm.cur <- popirm.new
                 pop_prob.cur <- pop_prob.new
+                accepts.k <- accepts.k + 1
             }
             
         }
+        
+        # save proportion accepted
+        accepts[k-1] <- accepts.k/popsize
         
         # draw new parameters
         probs[k] <- update_prob(W = W.cur, p.prior = p.prior)
