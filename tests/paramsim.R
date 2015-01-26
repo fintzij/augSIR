@@ -4,7 +4,7 @@ beta.prior = c(.012, 1.1)
 mu.prior = c(0.96, 1.96)
 p.prior = c(0.022, 0.084)
 
-param.res <- matrix(nrow = 1000, ncol = 3)
+param.res <- matrix(nrow = 50, ncol = 3)
 
 for(j in 1:50){
     print(j)

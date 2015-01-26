@@ -47,6 +47,7 @@ SIRsim <- function(popsize, S0, I0, b, mu, a=0, tmax, censusInterval, sampprob, 
         tau <- rexp(1, rate=rate)
         
         p <- runif(1); probs <- cumsum(c(h1t, h2t))/rate
+        iTi <- iTi + tau*infectednow
         
         if (p <= probs[1]) { #infection happens
             timenow <- timenow + tau; infectednow <- infectednow + 1; susceptiblenow <- susceptiblenow - 1
@@ -59,7 +60,6 @@ SIRsim <- function(popsize, S0, I0, b, mu, a=0, tmax, censusInterval, sampprob, 
             
         } else if(p>probs[1]){ # recovery happens
             
-            iTi <- iTi + tau*infectednow
             
             timenow <- timenow + tau; infectednow <- infectednow - 1; susceptiblenow <- susceptiblenow
 #             durations <- timenow - X[X[,3]!=0 & X[,2] %in% which.inf, 1]; durations <- cumsum(durations)/sum(durations)

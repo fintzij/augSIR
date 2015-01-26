@@ -24,15 +24,18 @@ drawpath <- function(Xt, Xother, irm, tmax){
                 path[1] <- path[2] <- Inf
             } else if(path[1] <= tmax){
                 path[2] <- drawtime(Xother, irm, path[1], t1, 2)
-                path[2] <- ifelse(path[2]>tmax,Inf,path[2])
+                
+                if(path[2] > tmax) path[2] <- Inf
+                
             }
+            
         }
         
     } else if(length(changetimes)==1){ ### all transitions occur in one observation period
         if((Xt[changetimes+1,2] - Xt[changetimes,2]) ==2){ ### Subject transitions from healthy to recovered within one observation period
             t0 <- Xt[changetimes,1]; t1 <- Xt[changetimes+1,1]
             path[1] <- drawtime(Xother, irm, t0, t1, 1)
-            path[2] <- ifelse(path[1]==Inf,Inf,drawtime(Xother, irm, path[1], t1, 2))
+            path[2] <- drawtime(Xother, irm, path[1], t1, 2)
             
         } else if(Xt[changetimes,2]==1 & ((Xt[changetimes+1,2] - Xt[changetimes,2]) == 1)){ # healthy to infected within one observation period
             t0 <- Xt[changetimes,1]; t1 <- Xt[changetimes+1,1]
@@ -40,7 +43,8 @@ drawpath <- function(Xt, Xother, irm, tmax){
             
             t0 <- Xt[dim(Xt)[1],1]; t1 <- Inf
             path[2] <- drawtime(Xother, irm, t0, t1, 2)
-            path[2] <- ifelse(path[2]>tmax,Inf,path[2])
+
+            if(path[2] > tmax) path[2] <- Inf
             
         } else if(Xt[changetimes,2]==2 & ((Xt[changetimes+1,2] - Xt[changetimes,2]) ==1)){ #infected to recovered within one observation period
             path[1] <- 0; t0 <- Xt[changetimes,1]; t1 <- Xt[changetimes+1,1]
@@ -49,7 +53,6 @@ drawpath <- function(Xt, Xother, irm, tmax){
         }
         
     } else if(length(changetimes)==2){
-        # Check this. Maybe the draw for the recovery is not correct here (I think it is by the memoryless property of exponentials).
         
         t0 <- Xt[changetimes[1],1]; t1 <- Xt[changetimes[1]+1,1]
         path[1] <- drawtime(Xother, irm, t0, t1, 1)
@@ -66,88 +69,70 @@ drawpath <- function(Xt, Xother, irm, tmax){
 # for all other subjects. irm is an array of instantaneous rate matrices. t0 and t1 are the left and right endpoints of the interval. 
 # current state is the infection status at t0. 
 
-
 drawtime <- function(Xother, irm, t0, t1, currentstate){
-    times <- unique(c(0,Xother[,1]))
-    
-    if(t1 == Inf){
-        if(currentstate == 2){
-            eventtime <- t0 - log(1-runif(1))/irm[2,3,1]
-            
-        } else if(currentstate == 1){
-            timeseq <- c(t0, times[times>t0])
-            if(length(timeseq) == 1) {
-                eventtime <- Inf
-                
-            } else if (length(timeseq) > 1){
-                init.infec <- sum(Xother[,3]==1 & Xother[,1]==0)
-                numinf <- c(init.infec, init.infec + cumsum(Xother[Xother[,1]!=0,3]))
-                
-                for(k in 1:(length(timeseq)-1)){
-                    ind <- which(irm[4,4,] == numinf[times <= timeseq[k]][sum(times<=timeseq[k])])
-                    
-                    eventtime<- timeseq[k] - log(1-runif(1))/irm[1,2,ind]
-                    if(eventtime < timeseq[k+1]) break
-                }
-                
-                if (eventtime>timeseq[length(timeseq)]) {
-                    eventtime <- Inf
-                }
-                
-            }
-        }
+    if(currentstate == 2){
+        eventtime <- t0 - log(1 - runif(1)*(1-exp(-irm[2,3,1] * (t1 - t0))))/irm[2,3,1]
         
-    } else if(t1 != Inf){
-        if(currentstate == 2){
-            eventtime <- t0 - log(1 - runif(1)*(1-exp(-irm[2,3,1] * (t1 - t0))))/irm[2,3,1]
-            
-        } else if(currentstate == 1){
-            if (t0 > max(times)){
-                eventtime <- Inf
+    } else if(currentstate ==1){
+        times <- unique(c(0,Xother[,1]))
+        timeseq <- c(t0, times[times > t0 & times < t1], t1)
+        
+        init.infec <- sum(Xother[Xother[,1]==0,3])
+        numinf <- c(init.infec, init.infec + cumsum(Xother[Xother[,1]!=0,3]))
+        
+        if(t1 != Inf){
+            if(length(timeseq)!=2) {
                 
-            } else if(t0 <= max(times)){
-                if(t1 < max(Xother[,1])){
-                    timeseq <- c(t0, times[times > t0 & times < t1], t1)
-                    
-                } else if(t1 >= max(times)){
-                    timeseq <- c(t0, times[times > t0])
+                intervalprobs <- rep(0,length(timeseq)-1)
+                timediffs <- diff(timeseq, lag = 1)
+                indstart <- sum(times<=timeseq[1]); indend <- sum(times<=timeseq[length(timeseq)-1])
+                totalprob <- 1 - exp(-sum(irm[1, 2,numinf[indstart:indend] + 1]*timediffs))
+                
+                for(k in 1:length(intervalprobs)){
+                    ind <- sum(times<=timeseq[k])
+                    intervalprobs[k] <- (1-exp(-sum(irm[1, 2, numinf[indstart:ind] + 1]*timediffs[1:k])))/totalprob
                 }
                 
-                init.infec <- sum(Xother[Xother[,1]==0,3])
-                numinf <- c(init.infec, init.infec + cumsum(Xother[Xother[,1]!=0,3]))
+                interval <- which(intervalprobs > runif(1))[1]
+                ind <- sum(times <= timeseq[interval])
                 
-                if(length(timeseq)!=2) {
+                if(numinf[ind] != 0) {
+                    eventtime <- timeseq[interval]-log(1-runif(1)*(1-exp(-irm[1, 2, numinf[ind] + 1]*timediffs[interval])))/irm[1, 2, numinf[ind] + 1]
                     
-                    intervalprobs <- rep(0,length(timeseq)-1)
-                    timediffs <- diff(timeseq, lag = 1)
-                    indstart <- sum(times<=timeseq[1]); indend <- sum(times<=timeseq[length(timeseq)-1])
-                    totalprob <- 1 - exp(-sum(irm[1, 2,match(numinf[indstart:indend], irm[4,4,])]*timediffs))
+                } else if(numinf[ind] == 0) {
+                    eventtime <- Inf
                     
-                    for(k in 1:length(intervalprobs)){
-                        ind <- sum(times<=timeseq[k])
-                        intervalprobs[k] <- (1-exp(-sum(irm[1, 2,match(numinf[indstart:ind], irm[4,4,])]*timediffs[1:k])))/totalprob
-                    }
+                }
+                
+            } else if(length(timeseq)==2){
+                timediffs <- t1 - t0; ind <- sum(times <= t0)
+                
+                if(numinf[ind] != 0){
+                    eventtime <- t0 - log(1 - runif(1)*(1 - exp(-irm[1, 2, numinf[ind] + 1]*(t1 - t0))))/irm[1, 2, numinf[ind] + 1]
                     
-                    interval <- which(intervalprobs > runif(1))[1]
-                    ind <- sum(times <= timeseq[interval])
                     
-                    eventtime<-timeseq[interval]-log(1-runif(1)*(1-exp(-irm[1, 2, match(numinf[ind], irm[4,4,])]*timediffs[interval])))/irm[1, 2, match(numinf[ind], irm[4,4,])]
+                } else if(numinf[ind] == 0){
+                    eventtime <- Inf
                     
-                } else if(length(timeseq)==2){
-                    timediffs <- t1 - t0; ind <- sum(times <= t0)
-                    
-                    indstart <- sum(times<=timeseq[1]); indend <- sum(times<=timeseq[length(timeseq)-1])
-                    
-                    eventtime <- t0 - log(1 - runif(1)*(1 - exp(-irm[1, 2, match(numinf[ind], irm[4,4,])]*(t1 - t0))))/irm[1, 2, match(numinf[ind], irm[4,4,])]
                 }
                 
             }
-        }
+            
+        } else if(t1 == Inf){
+            for(k in 1:(length(timeseq)-1)){
+                ind <- sum(times<=timeseq[k])
+                
+                eventtime<- timeseq[k] - log(1-runif(1))/irm[1,2, numinf[ind] + 1]
+                if(eventtime < timeseq[k+1]) break
+            }
+            
+        }        
+        
     }
     
     return(eventtime)
+    
 }
-
 
 # drawXt draws the status of a subject at observation times t1,...,tL conditional on other individuals
 # Xother is a matrix with the times of carriage aquisition and clearance for all other subjects. 
@@ -181,7 +166,7 @@ fwd <- function(Xother, W, irm, irm.eig, initdist, p){
         
     tpm <- obstpm(numinf = numsick, eventtimes = eventtimes, irm = irm, irm.eig = irm.eig, t0 = obstimes[1], t1 = obstimes[2])
     
-    ind <- which(Xobs[,1] <= obstimes[2])[sum(Xobs[,1] <= obstimes[2])]
+    ind <- which(eventtimes <= obstimes[2])[sum(eventtimes <= obstimes[2])]
     numinf.aug <- numsick[ind]; numinf.obs <- W[2,2]
     
     if(p!=1){
@@ -199,7 +184,7 @@ fwd <- function(Xother, W, irm, irm.eig, initdist, p){
         
         distr <- colSums(Xt.fb[,,k-1])
         
-        ind <- which(Xobs[,1] <= obstimes[k+1])[sum(Xobs[,1] <= obstimes[k+1])]
+        ind <- which(eventtimes <= obstimes[k+1])[sum(eventtimes <= obstimes[k+1])]
         numinf.aug <- numsick[ind]; numinf.obs <- W[k+1,2]
         
         if(p==1){
@@ -317,9 +302,9 @@ obstpm <- function(numinf, eventtimes, irm, irm.eig, t0, t1){
     tpm <- diag(1,3) 
     
     for (j in 1:(length(timeseq)-1)) {
-        ind.sick <- which(eventtimes <= timeseq[j])[sum(eventtimes <= timeseq[j])]
+        ind.sick <- sum(eventtimes <= timeseq[j])
         
-        ind <- match(numinf[ind.sick], irm[4,4,])
+        ind <- irm[4,4,numinf[ind.sick] + 1]
             
         tpm <- tpm %*% buildtpm(values = irm.eig[,,1,ind],
                                 vectors = irm.eig[,,2,ind],
@@ -513,7 +498,7 @@ path_prob <- function(path, Xother, pathirm, initdist, tmax){
     
     if(all(path==0)){ # no infection observed
                 
-        path.prob <- log(initdist[1])-sum(pathirm[1, 2, match(numinf[1:(indend - 1)],pathirm[4,4,])] * timediffs)
+        path.prob <- log(initdist[1])-sum(pathirm[1, 2, numinf[1:(indend - 1)] + 1] * timediffs)
             
     } else if(path[2] > 0 & path[2] < Inf) { # subject is infected and recovery is observed
         
@@ -525,14 +510,14 @@ path_prob <- function(path, Xother, pathirm, initdist, tmax){
                         
             if(times[2] > path[1]){ # no changes in number of other infecteds before subject's infection
                 
-                path.prob <- log(initdist[1]) + log(pathirm[1,2, match(init.infec,pathirm[4,4,])]) - pathirm[1,2,match(init.infec, pathirm[4,4,])]*path[1] + 
+                path.prob <- log(initdist[1]) + log(pathirm[1,2, init.infec + 1]) - pathirm[1,2, init.infec+1]*path[1] + 
                     log(pathirm[2,3,1]) - pathirm[2,3,1]*(path[2] - path[1])
                 
             } else if(times[2] < path[1]){ # if there is at least one change in the number of infecteds before the subject's infection
                 ind1 <- which(times < path[1])[sum(times < path[1])]
                 
-                path.prob <- log(initdist[1]) - sum(pathirm[1,2, match(numinf[1:(ind1-1)], pathirm[4,4,])] * timediffs[1:(ind1-1)]) + 
-                    log(pathirm[1,2,match(numinf[ind1], pathirm[4,4,])]) - pathirm[1,2, match(numinf[ind1], pathirm[4,4,])]*(path[1] - times[ind1]) + 
+                path.prob <- log(initdist[1]) - sum(pathirm[1,2, numinf[1:(ind1-1)] + 1] * timediffs[1:(ind1-1)]) + 
+                    log(pathirm[1,2,numinf[ind1] + 1]) - pathirm[1,2, numinf[ind1]+1]*(path[1] - times[ind1]) + 
                     log(pathirm[2,3,1]) - pathirm[2,3,1]*(path[2] - path[1]) 
 
             }
@@ -548,13 +533,13 @@ path_prob <- function(path, Xother, pathirm, initdist, tmax){
                         
             if(times[2] > path[1]){ # no changes in number of infecteds before subject's infection
                 
-                path.prob <- log(initdist[1]) + log(pathirm[1,2, match(init.infec,pathirm[4,4,])]) - pathirm[1,2,match(init.infec,pathirm[4,4,])]*path[1] - pathirm[2,3,1]*(tmax - path[1])
+                path.prob <- log(initdist[1]) + log(pathirm[1,2, init.infec + 1]) - pathirm[1,2, init.infec + 1]*path[1] - pathirm[2,3,1]*(tmax - path[1])
                 
             } else if(times[2] < path[1]){ # if there is at least one change in the number of infecteds before the subject's infection
                 ind1 <- which(times < path[1])[sum(times < path[1])]
                 
-                path.prob <- log(initdist[1]) - sum(pathirm[1,2, match(numinf[1:(ind1-1)], pathirm[4,4,])] * timediffs[1:(ind1-1)]) + 
-                    log(pathirm[1,2,match(numinf[ind1], pathirm[4,4,])]) - pathirm[1,2, match(numinf[ind1], pathirm[4,4,])]*(path[1] - times[ind1])  -
+                path.prob <- log(initdist[1]) - sum(pathirm[1,2, numinf[1:(ind1-1)] + 1] * timediffs[1:(ind1-1)]) + 
+                    log(pathirm[1,2, numinf[ind1] + 1]) - pathirm[1,2, numinf[ind1] + 1]*(path[1] - times[ind1])  -
                     pathirm[2,3,1]*(tmax - path[1])
                 
             }
@@ -562,6 +547,11 @@ path_prob <- function(path, Xother, pathirm, initdist, tmax){
     } 
     
     return(path.prob)
+}
+
+obs_prob <- function(W, p){
+    dbinom(x = sum(W[,2]), size = sum(W[,3]), prob = p, log = TRUE)
+
 }
 
 # Functions to update parameters
@@ -675,7 +665,7 @@ augSIR <- function(dat, sim.settings, priors, inits, returnX = FALSE) {
     accepts <- vector(length = (niter - 1))
     
     # vectors for parameters of distributions for beta, mu, and p. beta and mu have gamma distributions, p has beta distribution.
-    beta.prior <- priors$beta.prior
+    beta.prior <- priors$beta.prior 
     mu.prior <- priors$mu.prior
     # alpha.prior <- c(6, 12000)
     p.prior <- priors$p.prior
@@ -733,6 +723,7 @@ augSIR <- function(dat, sim.settings, priors, inits, returnX = FALSE) {
             path.new<- drawpath(Xt = Xt, Xother = Xother, irm = pathirm.cur, tmax = tmax)
             
             X.new <- updateX(X = X.cur, Xt.path = path.new, j = subjects[j]); path.new <- getpath(X = X.new, j = subjects[j])
+            W.new <- updateW(W.cur,X.new)
             
             if(max(cumsum(X.new[,3])) == pathirm.cur[4,4,dim(pathirm.cur)[3]]){
 
@@ -749,11 +740,15 @@ augSIR <- function(dat, sim.settings, priors, inits, returnX = FALSE) {
             path_prob.new <- path_prob(path = path.new, Xother = Xother, pathirm = pathirm.cur, initdist = initdist, tmax = tmax)
             path_prob.cur <- path_prob(path = path.cur, Xother = Xother, pathirm = pathirm.cur, initdist = initdist, tmax = tmax)
             
-            a.prob <- accept_prob(pop_prob.new, pop_prob.cur, path_prob.cur, path_prob.new)
+            obs_prob.new <- obs_prob(W.new)
+            obs_prob.cur <- obs_prob(W.cur)
+            
+            a.prob <- accept_prob(pop_prob.new = pop_prob.new, pop_prob.cur = pop_prob.cur, path_prob.cur = path_prob.cur, 
+                                  path_prob.new = path_prob.new, obs_prob.new = obs_prob.new, obs_prob.cur = obs_prob.cur)
             
             if(min(a.prob, 0) > log(runif(1))) {
                 X.cur <- X.new
-                W.cur <- updateW(W.cur,X.new)
+                W.cur <- W.new
                 popirm.cur <- popirm.new
                 pop_prob.cur <- pop_prob.new
                 accepts.k <- accepts.k + 1
@@ -794,4 +789,96 @@ augSIR <- function(dat, sim.settings, priors, inits, returnX = FALSE) {
     return(results)
     
 }
+
+
+# Deprecated --------------------------------------------------------------
+
+# 
+# drawtime <- function(Xother, irm, t0, t1, currentstate){
+#     times <- unique(c(0,Xother[,1]))
+#     
+#     if(t1 == Inf){
+#         if(currentstate == 2){
+#             eventtime <- t0 - log(1-runif(1))/irm[2,3,1]
+#             
+#         } else if(currentstate == 1){
+#             timeseq <- c(t0, times[times>t0])
+#             
+#             if(length(timeseq) == 1){
+#                 init.infec <- sum(Xother[Xother[,1]==0,3])
+#                 numinf <- c(init.infec, init.infec + cumsum(Xother[Xother[,1]!=0,3]))
+#                 
+#                 ind <- sum(times <= timeseq[k])
+#                 
+#                 if(numinf[ind] == 0){
+#                     eventtime <- Inf
+#                     
+#                 } else if(numinf[ind] != 0){
+#                     eventtime <- t0 - log(1 - runif(1))/irm[1, 2, numinf[ind] + 1]
+#                     
+#                 }
+#                 
+#             } else if(length(timeseq) > 1){
+#                 init.infec <- sum(Xother[Xother[,1]==0,3])
+#                 numinf <- c(init.infec, init.infec + cumsum(Xother[Xother[,1]!=0,3]))
+#                 
+#                 for(k in 1:(length(timeseq)-1)){
+#                     ind <- sum(times<=timeseq[k])
+#                     
+#                     eventtime<- timeseq[k] - log(1-runif(1))/irm[1,2, numinf[ind] + 1]
+#                     if(eventtime < timeseq[k+1]) break
+#                 }
+#                 
+#                 if (eventtime>timeseq[length(timeseq)]) {
+#                     eventtime <- Inf
+#                     
+#                 }
+#                 
+#             }
+#             
+#         }
+#         
+#     } else if(t1 != Inf){
+#         if(currentstate == 2){
+#             eventtime <- t0 - log(1 - runif(1)*(1-exp(-irm[2,3,1] * (t1 - t0))))/irm[2,3,1]
+#             
+#         } else if(currentstate == 1){
+#             if (t0 > max(times)){
+#                 eventtime <- Inf
+#                 
+#             } else if(t0 <= max(times)){
+#                 timeseq <- c(t0, times[times > t0 & times < t1], t1)
+#                 
+#                 init.infec <- sum(Xother[Xother[,1]==0,3])
+#                 numinf <- c(init.infec, init.infec + cumsum(Xother[Xother[,1]!=0,3]))
+#                 
+#                 if(length(timeseq)!=2) {
+#                     
+#                     intervalprobs <- rep(0,length(timeseq)-1)
+#                     timediffs <- diff(timeseq, lag = 1)
+#                     indstart <- sum(times<=timeseq[1]); indend <- sum(times<=timeseq[length(timeseq)-1])
+#                     totalprob <- 1 - exp(-sum(irm[1, 2,numinf[indstart:indend] + 1]*timediffs))
+#                     
+#                     for(k in 1:length(intervalprobs)){
+#                         ind <- sum(times<=timeseq[k])
+#                         intervalprobs[k] <- (1-exp(-sum(irm[1, 2, numinf[indstart:ind] + 1]*timediffs[1:k])))/totalprob
+#                     }
+#                     
+#                     interval <- which(intervalprobs > runif(1))[1]
+#                     ind <- sum(times <= timeseq[interval])
+#                     
+#                     eventtime<-timeseq[interval]-log(1-runif(1)*(1-exp(-irm[1, 2, numinf[ind] + 1]*timediffs[interval])))/irm[1, 2, numinf[ind] + 1]
+#                     
+#                 } else if(length(timeseq)==2){
+#                     timediffs <- t1 - t0; ind <- sum(times <= t0)
+#                     
+#                     eventtime <- t0 - log(1 - runif(1)*(1 - exp(-irm[1, 2, numinf[ind] + 1]*(t1 - t0))))/irm[1, 2, numinf[ind] + 1]
+#                 }
+#                 
+#             }
+#         }
+#     }
+#     
+#     return(eventtime)
+# }
 
