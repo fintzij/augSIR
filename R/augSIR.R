@@ -242,7 +242,7 @@ buildirm <- function(X, b, m, a=0, popsize, pop){
         Xobs <- rbind(c(0,0,init.infec), X[X[,1]!=0,]); indend <- dim(Xobs)[1]
         
         numinf <- cumsum(Xobs[,3])
-        numsusc <-  popsize - cumsum(c(init.infec,Xobs[2:indend,3]==1)) 
+        numsusc <-  popsize - cumsum(Xobs[,3]>0) 
         
         irm <- array(0, dim = c(3,3, length(numinf) - 1))
         irm[1,2,] <- (b*numinf[1:(indend-1)] + a)*numsusc[1:(indend-1)]; irm[1,1,] <- -irm[1,2,]
