@@ -135,7 +135,7 @@ drawtime <- function(Xcount, irm, t0, t1, currentstate){
 # Forward-Backward Functions (forward, backward, drawXt) ----------------------------------------------
 
 # forward builds the forward matrices as in Scott (2002), taking as arguments an array of tpms, a matrix of emission probabilities, and an initial distribution over the state at t0
-forward <- function(tpms, emits, initdist){
+fwd <- function(tpms, emits, initdist){
     fbmats <- array(0, dim = dim(tpms))
     
     pi0 <- normalize(initdist * emits[,1])
@@ -149,8 +149,8 @@ forward <- function(tpms, emits, initdist){
     return(fbmats)
 }
 
-# backward takes as an argument the array of matrices produced by forward and returns a draw at each observation time. The default argument for the prior on end states is the unit vector
-backward <- function(mats, end.prior = c(1, 1, 1)){
+# bwd takes as an argument the array of matrices produced by forward and returns a draw at each observation time. The default argument for the prior on end states is the unit vector
+bwd <- function(mats, end.prior = c(1, 1, 1)){
     states <- rep(1, dim(mats)[3]+1)
     
     states[length(states)] <- sample.int(n = 3, size = 1, prob = end.prior%*%mats[,,dim(mats)[3]])
@@ -163,6 +163,15 @@ backward <- function(mats, end.prior = c(1, 1, 1)){
     return(states)
 } 
 
+# fb_marginals calculates the marginal distributions \pi_s(t | theta), taking as arguments an array of fb matrices from forward, and a matrix with columns the initial dist at t0 and emission probs at t0
+fb_marginals <- function(fbmats, t0.probs){
+    marginals <- matrix(0, dim = c(3, dim(fbmats)[3]+1))
+    
+    marginals[,1] <- normalize(t0.probs[,1]*t0.probs[,2])
+    
+    marginals[,2:dim(marginals)] <- apply(fbmats,3, colSums)
+}
+
 # drawXt draws the status of a subject at observation times t1,...,tL conditional on other individuals
 # Xcount is a matrix with the population trajectory for all other subjects. 
 # p, is the sampling probability, and b, and m are the epidemiologic parameters. initdist is the initial
@@ -174,9 +183,9 @@ drawXt <- function(Xcount, irm, irm.eig, W, p, initdist){
     tpms <- tpm_seq(Xcount = Xcount, obstimes = W[,1], irm.eig = irm.eig)
     emits <- emit_seq(W = W, p = p)
     
-    fbmats <- forward(tpms = tpms, emits = emits, initdist = initdist)
+    fbmats <- fwd(tpms = tpms, emits = emits, initdist = initdist)
     
-    Xt[,2] <- backward(mats = fbmats)
+    Xt[,2] <- bwd(mats = fbmats)
     
     return(Xt)
 }
