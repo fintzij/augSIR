@@ -375,6 +375,40 @@ updateX <- function(X, Xt.path, j){
 }
 
 
+# get_Wother obtains the observation matrix excluding subject j
+get_W_other <- function(W.cur, path.cur){
+    Wother <- W.cur
+    
+    if(all(path.cur != 0)){
+        Wother[,3] <- Wother[,3] - ((Wother[,1] >= path.cur[1]) & (Wother[,1] <= path.cur[2]))
+        
+    }
+    
+    return(Wother)
+} 
+
+# get_Xcount_other obtains the count matrix excluding subject j
+get_Xcount_other <- function(Xcount, path.cur){
+    
+    if(all(path.cur == 0)){
+        Xcount.other <- Xcount
+        
+    } else if(path.cur[1] == 0 & path.cur[2] != 0){
+        Xcount.other <- Xcount[Xcount[,1] != path[2],]
+        Xcount.other[,2] <- Xcount.other[,2] - (Xcount.other[,1] <= path[2])
+        
+    } else if(path.cur)
+    
+    if(all(path.cur !=0)){
+        Xcount.other <- Xcount[!(Xcount %in% path.cur), ]
+        
+        Xcount.other[,3] <- Xcount.other[,3] - (Xcount.other[,1] < path.cur[1])
+        Xcount.other[,2] <- Xcount.other[,2] - ((Xcount.other[,1] >= path.cur[1]) & (Xcount.other[,1] <= path.cur[2]))
+    }
+    
+    return(Xcount.other)    
+}
+
 # Metropolis-Hastings Ratio related functions (accept_prob, obs_prob, cacl_loglike, path_prob, pop_prob) ----------------------
 
 # accept_prob calculates the acceptance ratio for the M-H algorithm
@@ -753,11 +787,11 @@ augSIR <- function(dat, sim.settings, priors, inits, returnX = FALSE) {
         
         for(j in 1:length(subjects)){
             Xother <- X.cur[X.cur[,2]!=subjects[j],]
-            Xcount.other <- build_countmat(X = Xother, popsize = popsize)
             
             path.cur <- getpath(X.cur, subjects[j])
             
-            W.other <-updateW(W = W.cur, Xcount = Xcount.other)
+            Xcount.other <- get_Xcount_other(Xcount = Xcount, popsize = popsize)
+            W.other <-get_W_other(W.cur = W.cur, path.cur = path.cur)
             
             Xt <- drawXt(Xcount = Xcount.other, irm = pathirm.cur, irm.eig = patheigen.cur, W=W.other, p=probs[k-1], initdist = initdist)
             
