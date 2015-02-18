@@ -242,10 +242,21 @@ irm_decomp <- function(pathirm.cur){
     
     irm.decomp[,, 1,] <- array(apply(sapply(decomp, '[[', 1), 2, diag), dim = c(3,3,length(decomp)))
     irm.decomp[,, 2,] <- array(sapply(decomp, '[[', 2), dim = c(3,3,length(decomp)))
+    
+    # check that the eigenvalues and eigenvectors are properly ordered
+    to_reorder <- which(pathirm.cur[1,1,] > pathirm.cur[2,2,])
+    if(length(to_reorder) > 0){
+        for(s in to_reorder){
+            diag(irm.decomp[,, 1,s]) <- diag(irm.decomp[,, 1,s])[c(2,1,3)]
+            irm.decomp[,,2,s] <- irm.decomp[,c(2,1,3),2,s]
+        }
+    }
+    
     irm.decomp[,, 3,] <- array(apply(irm.decomp[,,2,], 3, solve), dim = c(3,3,length(decomp)))
     
     return(irm.decomp)
 }
+
 
 # update_irm updates the array of individual level irms, adding a new irm to the end of the array
 update_irm <- function(irm, new.numinf, b, m, a, popsize){
@@ -261,11 +272,19 @@ update_irm <- function(irm, new.numinf, b, m, a, popsize){
 
 # update_eigen updates the array of eigen decompositions associated with the array of individual level irms, adding a new array at the end
 update_eigen <- function(patheigen, pathirm){
-    decomp <- eigen(pathirm[c(1:3),c(1:3),dim(pathirm)[3]], symmetric = FALSE)
+    ind <- dim(pathirm)[3]
+    
+    decomp <- eigen(pathirm[c(1:3),c(1:3),ind], symmetric = FALSE)
+    
+    if(pathirm[1,1,ind] > pathirm[2,2,ind]){
+        decomp$values <- decomp$values[c(2,1,3)]
+        decomp$vectors <- decomp$vectors[,c(2,1,3)]
+    }
     
     eigen.new <- array(c(patheigen, 
                          array(c(diag(decomp$values), decomp$vectors, solve(decomp$vectors)), dim = c(3,3,3))), 
-                       dim = c(3,3,3,dim(patheigen)[4] + 1))        
+                       dim = c(3,3,3,dim(patheigen)[4] + 1))   
+    
     
     return(eigen.new)    
 }
