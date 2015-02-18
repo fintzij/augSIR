@@ -181,12 +181,12 @@ sim_one_SIR <- function(numsick, eventtimes, obstimes, b, m, initdist, returnpat
 
 # sim_one_tpms simulates infection statuses at a sequence of observation times directly from transition probability matrices
 sim_one_tpms <- function(tpms, initdist) {
-    states <- vector(0, length = dim(tpms)[3])
+    states <- rep(0, dim(tpms)[3] + 1)
     
     states[1] <- sample.int(n = 3, size = 1, prob = initdist)
     
-    for(s in 2:length(states)) {
-        states[s] <- sample.int(n = 3, size = 1, prob = tpms[k-1,,s])
+    for(s in 1:dim(tpms)[3]) {
+        states[s+1] <- sample.int(n = 3, size = 1, prob = tpms[states[s],,s])
         
     }
     
