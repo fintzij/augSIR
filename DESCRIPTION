@@ -1,11 +1,11 @@
 Package: augSIR
 Type: Package
 Title: Estimation of stochastic SIR epidemic parameters via Bayesian data augmentation.
-Version: 0.11
+Version: 0.12
 Date: 2014-12-15
 Author: Jonathan Fintzi
 Maintainer: Jonathan Fintzi <fintzij@uw.edu>
-Description: 
+Description: Estimation of stochastic SIR epidemic parameters via Bayesian data augmentation.
 License: What license is it under? GPL-3
 Depends: Rcpp,
     RcppArmadillo,
