@@ -91,7 +91,7 @@ drawtime <- function(Xcount, irm, t0, t1, currentstate){
                     intervalprobs[k] <- (1-exp(-sum(irm[1, 2, numinf[indstart:ind] + 1]*timediffs[1:k])))/totalprob
                 }
                 
-                interval <- sample.int(n = length(intervalprobs), size = 1, prob = intervalprobs)
+                interval <- which(intervalprobs > runif(1))[1]
                 ind <- sum(times <= timeseq[interval])
                 
                 if(numinf[ind] != 0) {
@@ -107,7 +107,6 @@ drawtime <- function(Xcount, irm, t0, t1, currentstate){
                 
                 if(numinf[ind] != 0){
                     eventtime <- t0 - log(1 - runif(1)*(1 - exp(-irm[1, 2, numinf[ind] + 1]*(t1 - t0))))/irm[1, 2, numinf[ind] + 1]
-                    
                     
                 } else if(numinf[ind] == 0){
                     eventtime <- Inf
