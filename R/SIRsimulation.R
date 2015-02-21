@@ -140,7 +140,9 @@ sim_one_SIR <- function(Xcount, obstimes, b, m, initdist, returnpath = FALSE){
         rate <- b*numsick[ind]
         
         while(keep.going == TRUE){
+            
             if(cur.time < tmax){
+                
                 tau <- rexp(1, rate)
                 if((cur.time + tau) < eventtimes[ind+1]){
                     path[1] <- cur.time + tau
@@ -160,6 +162,7 @@ sim_one_SIR <- function(Xcount, obstimes, b, m, initdist, returnpath = FALSE){
                     rate <- b*numsick[ind]
                     
                 }
+                
             } else if(cur.time >= max(eventtimes)){
                 keep.going <- FALSE
                 
