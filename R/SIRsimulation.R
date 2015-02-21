@@ -122,7 +122,7 @@ SIRsim <- function(popsize, S0, I0, b, mu, a=0, tmax, censusInterval, sampprob, 
 }
 
 # sim_one_SIR simulates a single SIR trajectory for one individual
-sim_one_SIR <- function(Xcount, obstimes, b, m, initdist, returnpath = FALSE){
+sim_one_SIR <- function(Xcount, obstimes, b, m, initdist, tmax, returnpath = FALSE){
     Xt <- rep(1, length(obstimes))
     eventtimes <- Xcount[,1]; numsick <- Xcount[,2]
     
@@ -140,7 +140,9 @@ sim_one_SIR <- function(Xcount, obstimes, b, m, initdist, returnpath = FALSE){
         rate <- b*numsick[ind]
         
         while(keep.going == TRUE){
+            
             if(cur.time < tmax){
+                
                 tau <- rexp(1, rate)
                 if((cur.time + tau) < eventtimes[ind+1]){
                     path[1] <- cur.time + tau
@@ -160,6 +162,7 @@ sim_one_SIR <- function(Xcount, obstimes, b, m, initdist, returnpath = FALSE){
                     rate <- b*numsick[ind]
                     
                 }
+                
             } else if(cur.time >= max(eventtimes)){
                 keep.going <- FALSE
                 
