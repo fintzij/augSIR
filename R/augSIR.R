@@ -312,7 +312,7 @@ obstpm <- function(Xcount, irm.eig, t0, t1){
                                 inv.vecs = irm.eig[,,3,ind],
                                 t0 = timeseq[j],
                                 t1 = timeseq[j+1])
-        
+#         
     }
     
     return(tpm)

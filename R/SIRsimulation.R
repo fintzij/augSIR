@@ -124,7 +124,7 @@ SIRsim <- function(popsize, S0, I0, b, mu, a=0, tmax, censusInterval, sampprob, 
 # sim_one_SIR simulates a single SIR trajectory for one individual
 sim_one_SIR <- function(Xcount, obstimes, b, m, initdist, tmax, returnpath = FALSE){
     Xt <- rep(1, length(obstimes))
-    eventtimes <- Xcount[,1]; numsick <- Xcount[,2]
+    eventtimes <- c(Xcount[,1],tmax); numsick <- Xcount[,2]
     
     initstate <- sample.int(3,1,prob=initdist)
     
