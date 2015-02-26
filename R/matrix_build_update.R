@@ -230,13 +230,13 @@ get_Xcount_other <- function(Xcount, path.cur){
         
         Xcount[,3] <- Xcount[,3] - 1 # subject was always susceptible, so we remove him from susceptible count
         
-    } else if(path.cur[1] == 0 & path.cur[2] != 0){
-        Xcount.other <- Xcount[Xcount[,1] != path[2],]
+    } else if(path.cur[1] == 0 & path.cur[2] != 0){# subject is initially infected and a recovery is observed
+        Xcount.other <- Xcount[Xcount[,1] != path[2],] # remove the row corresponding to the recovery 
         
         Xcount.other[,2] <- Xcount.other[,2] - (Xcount.other[,1] < path[2])
         
-    } else if(!any(path.cur == 0)){
-        Xcount.other <- Xcount[!(Xcount[,1] %in% path.cur), ] # remove the rows corresponding to the event times for the current path
+    } else if(all(path.cur != 0)){ # if subject is not initially infected, and and infection is observed
+        Xcount.other <- Xcount[!(Xcount[,1] %in% path.cur), ] # remove the rows corresponding to the event times for the current path. note that Inf is never in the event times, so we are not falsely removing an unobserved recovery
         
         Xcount.other[,3] <- Xcount.other[,3] - (Xcount.other[,1] < path.cur[1]) # remove subject j from the susceptibles count for the times when he was susceptible
         Xcount.other[,2] <- Xcount.other[,2] - ((Xcount.other[,1] > path.cur[1]) & (Xcount.other[,1] < path.cur[2])) # remove subject j from the infecteds count when he was infected

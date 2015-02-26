@@ -65,14 +65,15 @@ augSIR <- function(dat, sim.settings, priors, inits, returnX = FALSE) {
         accepts.k <- 0
         
         for(j in 1:length(subjects)){
+            
             Xother <- X.cur[X.cur[,2]!=subjects[j],]
             
             path.cur <- getpath(X.cur, subjects[j])
             
-            Xcount.other <- get_Xcount_other(Xcount = Xcount, path.cur = path.cur)
+            Xcount.other <- get_Xcount_other(Xcount = Xcount.cur, path.cur = path.cur)
             W.other <-get_W_other(W.cur = W.cur, path.cur = path.cur)
             
-            path.new<- draw_path(Xt = Xt, Xcount = Xcount.other, irm = pathirm.cur, irm.eig = patheigen.cur, W = W.other, p = probs[k], initdist = initdist, tmax = tmax)
+            path.new<- draw_path(Xcount = Xcount.other, irm = pathirm.cur, irm.eig = patheigen.cur, W = W.other, p = probs[k-1], initdist = initdist, tmax = tmax)
             
             X.new <- updateX(X = X.cur, Xt.path = path.new, j = subjects[j]); path.new <- getpath(X = X.new, j = subjects[j])
             Xcount.new <- build_countmat(X = X.new, popsize = popsize)
