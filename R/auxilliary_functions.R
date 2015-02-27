@@ -170,3 +170,13 @@ infec_durs <- function(X,ids){
     
     return(durs)
 }
+
+# insertRow inserts a row into a data frame
+insertRow <- function(df, newrow, j) {
+    
+    df <- rbind(df, newrow, deparse.level=0)
+    
+    df <- df[order(c(1:(nrow(df)-1), j-0.5)), ]
+    
+    return(df)
+}

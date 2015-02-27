@@ -176,11 +176,12 @@ emit_seq <- function(W, p){
 updateW <- function(W, Xcount, path){
     if(missing(path)){
         for(k in 1:dim(W)[1]){
+            
             W[k,3] <- Xcount[sum(Xcount[,1]<=W[k,1]),2]
             
         }
         
-    } else if(missing(Xcount) & !all(path == 0)){
+    } else if(missing(Xcount) & !all(path == 0)){ # Important note: when the path is provided, we should be updating Wother
         W[,3] <- W[,3] + ((W[,1] >= path[1]) & (W[,1] <= path[2]))
         
     }
@@ -191,17 +192,17 @@ updateW <- function(W, Xcount, path){
 
 # updateX updates the matix of observations X whose columns are event times, subject id, and event codes. Inputs are the original X matrix,
 # a vector of times, and the subject id. The function returns an update X matrix, ordered by event time. 
-updateX <- function(X, Xt.path, j){
-    if(all(Xt.path == 0) | all(Xt.path == Inf)){
+updateX <- function(X, path, j){
+    if(all(path == 0) | all(path == Inf)){
         X[X[,2]==j,c(1,3)] <- 0
         
-    }  else if(Xt.path[1] != Inf & Xt.path[2] ==Inf){
-        X[X[,2]==j,][1,1] <- Xt.path[1]; X[X[,2]==j,][1,3] <- 1
+    }  else if(path[1] != Inf & path[2] ==Inf){
+        X[X[,2]==j,][1,1] <- path[1]; X[X[,2]==j,][1,3] <- 1
         X[X[,2]==j,][2,1] <- 0 ; X[X[,2]==j,][2,3] <- 0
         
-    } else if(all(Xt.path!=Inf)){
-        X[X[,2]==j,][1,1] <- Xt.path[1]; X[X[,2]==j,][1,3] <- 1
-        X[X[,2]==j,][2,1] <- Xt.path[2] ; X[X[,2]==j,][2,3] <- -1
+    } else if(all(path!=Inf)){
+        X[X[,2]==j,][1,1] <- path[1]; X[X[,2]==j,][1,3] <- 1
+        X[X[,2]==j,][2,1] <- path[2] ; X[X[,2]==j,][2,3] <- -1
     }
     
     X <- X[order(X[,1]),]
@@ -209,13 +210,53 @@ updateX <- function(X, Xt.path, j){
     return(X)
 }
 
+# update_Xcount updates the Xcount.other matrix with a new sample path
+update_Xcount <- function(Xcount.other, path){
+    
+    if(all(path == 0)){
+        Xcount <- Xcount.other
+        
+        Xcount[,3] <- Xcount[,3] + 1 # subject was always susceptible, so we add him from susceptible count
+        
+    } else if(path[1] == 0 & path[2] != 0){# subject is initially infected and a recovery is observed
+        
+        ind <- sum(Xcount.other[,1] <= path[2]) + 1
+        Xcount <- insertRow(Xcount.other, c(path[2], Xcount.other[ind - 1, 2:3]), ind)
+        
+        Xcount[1:(ind-1), 2] <- Xcount[1:(ind -1), 2] + 1
+        
+    } else if(all(path != 0)){ # if subject is not initially infected, and and infection is observed
+        
+        ind1 <- sum(Xcount.other[,1] <= path[1]) + 1 
+        
+        Xcount <- insertRow(Xcount.other, c(path[1], Xcount.other[ind1 - 1, 2:3]), ind1)
+        
+        Xcount[1:(ind1 - 1), 3] <- Xcount[1:(ind1 - 1), 3] + 1 # add subject to the count of susceptibles for the times when he was susceptible
+        
+        if(path[2] != Inf){
+            
+            ind2 <- sum(Xcount[,1] <= path[2]) + 1
+            Xcount <- insertRow(Xcount, c(path[2], Xcount[ind2 - 1, 2:3]), ind2)
+            
+            Xcount[ind1:(ind2-1), 2] <- Xcount[ind1:(ind2-1), 2] + 1 # add subject to the count of infecteds for the times he was infected
+            
+        } else if(path[2] == Inf){
+            
+            Xcount[ind1:nrow(Xcount), 2] <- Xcount[ind1:nrow(Xcount), 2] + 1 # add subject to the count of infecteds for the times he was infected
+        }
+        
+    }
+    
+    return(Xcount)
+    
+}
 
 # get_Wother obtains the observation matrix excluding subject j
-get_W_other <- function(W.cur, path.cur){
+get_W_other <- function(W.cur, path){
     Wother <- W.cur
     
-    if(all(path.cur != 0)){
-        Wother[,3] <- Wother[,3] - ((Wother[,1] >= path.cur[1]) & (Wother[,1] <= path.cur[2]))
+    if(all(path != 0)){
+        Wother[,3] <- Wother[,3] - ((Wother[,1] >= path[1]) & (Wother[,1] <= path[2]))
         
     }
     
@@ -223,23 +264,23 @@ get_W_other <- function(W.cur, path.cur){
 } 
 
 # get_Xcount_other obtains the count matrix excluding subject j
-get_Xcount_other <- function(Xcount, path.cur){
+get_Xcount_other <- function(Xcount, path){
     
-    if(all(path.cur == 0)){
+    if(all(path == 0)){
         Xcount.other <- Xcount
         
         Xcount[,3] <- Xcount[,3] - 1 # subject was always susceptible, so we remove him from susceptible count
         
-    } else if(path.cur[1] == 0 & path.cur[2] != 0){# subject is initially infected and a recovery is observed
+    } else if(path[1] == 0 & path[2] != 0){# subject is initially infected and a recovery is observed
         Xcount.other <- Xcount[Xcount[,1] != path[2],] # remove the row corresponding to the recovery 
         
         Xcount.other[,2] <- Xcount.other[,2] - (Xcount.other[,1] < path[2])
         
-    } else if(all(path.cur != 0)){ # if subject is not initially infected, and and infection is observed
-        Xcount.other <- Xcount[!(Xcount[,1] %in% path.cur), ] # remove the rows corresponding to the event times for the current path. note that Inf is never in the event times, so we are not falsely removing an unobserved recovery
+    } else if(all(path != 0)){ # if subject is not initially infected, and and infection is observed
+        Xcount.other <- Xcount[!(Xcount[,1] %in% path), ] # remove the rows corresponding to the event times for the current path. note that Inf is never in the event times, so we are not falsely removing an unobserved recovery
         
-        Xcount.other[,3] <- Xcount.other[,3] - (Xcount.other[,1] < path.cur[1]) # remove subject j from the susceptibles count for the times when he was susceptible
-        Xcount.other[,2] <- Xcount.other[,2] - ((Xcount.other[,1] > path.cur[1]) & (Xcount.other[,1] < path.cur[2])) # remove subject j from the infecteds count when he was infected
+        Xcount.other[,3] <- Xcount.other[,3] - (Xcount.other[,1] < path[1]) # remove subject j from the susceptibles count for the times when he was susceptible
+        Xcount.other[,2] <- Xcount.other[,2] - ((Xcount.other[,1] > path[1]) & (Xcount.other[,1] < path[2])) # remove subject j from the infecteds count when he was infected
     }
     
     return(Xcount.other)    

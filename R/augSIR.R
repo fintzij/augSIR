@@ -35,7 +35,7 @@ augSIR <- function(dat, sim.settings, priors, inits, returnX = FALSE) {
     Xcount.cur <- build_countmat(X = X.cur, popsize = popsize)
     
     # update observation matrix
-    W.cur <- updateW(W = W.cur, Xcount = Xcount.cur)
+    W.new <- updateW(W = W.other, path = path.new)
     
     if(returnX == TRUE) {
         trajectories <- list(length = niter)
@@ -70,14 +70,15 @@ augSIR <- function(dat, sim.settings, priors, inits, returnX = FALSE) {
             
             path.cur <- getpath(X.cur, subjects[j])
             
-            Xcount.other <- get_Xcount_other(Xcount = Xcount.cur, path.cur = path.cur)
-            W.other <-get_W_other(W.cur = W.cur, path.cur = path.cur)
+            Xcount.other <- get_Xcount_other(Xcount = Xcount.cur, path = path.cur)
+            W.other <-get_W_other(W.cur = W.cur, path = path.cur)
             
             path.new<- draw_path(Xcount = Xcount.other, irm = pathirm.cur, irm.eig = patheigen.cur, W = W.other, p = probs[k-1], initdist = initdist, tmax = tmax)
             
-            X.new <- updateX(X = X.cur, Xt.path = path.new, j = subjects[j]); path.new <- getpath(X = X.new, j = subjects[j])
-            Xcount.new <- build_countmat(X = X.new, popsize = popsize)
-            W.new <- updateW(W.cur,X.new)
+            X.new <- updateX(X = X.cur, path = path.new, j = subjects[j]); path.new <- getpath(X = X.new, j = subjects[j])
+            Xcount.new <- update_Xcount(Xcount.other = Xcount.other, path = path.new)
+            
+            W.new <- updateW(W = W.other, path = path.new)
             
             if(max(Xcount.new[,2]) == pathirm.cur[4,4,dim(pathirm.cur)[3]]){
                 
