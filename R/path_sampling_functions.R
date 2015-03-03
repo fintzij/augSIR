@@ -1,48 +1,23 @@
 
-# drawtime draws an event time for either carriage acquisition or clearance. Xother is a matrix with the times of acquisition and clearance
-# for all other subjects. irm is an array of instantaneous rate matrices. t0 and t1 are the left and right endpoints of the interval. 
-# current state is the infection status at t0. 
-
-drawtime <- function(Xcount, irm, t0, t1, currentstate){
+# draw_path draws the path for a subject conditional on the other trajectories. Calls are first made to fwd and bwd in order to draw the infection status at observation times. 
+# a call is then made to draw_subpath which samples the infection status at event times, and then samples the event times from the endpoint conditioned markov chain 
+draw_path <- function(Xcount, irm, irm.eig, W, p, initdist, tmax){
     
-    if(currentstate == 2){
-        eventtime <- t0 - log(1 - runif(1)*(1-exp(-irm[2,3,1] * (t1 - t0))))/irm[2,3,1]
-        
-    } else if(currentstate ==1){
-        times <- Xcount[,1]; numinf <- Xcount[,2]
-        
-        if(t1 != Inf){
-            ind <- sum(times <= t0)
-            
-            if(numinf[ind] != 0){
-                eventtime <- t0 - log(1 - runif(1)*(1 - exp(-irm[1, 2, numinf[ind] + 1]*(t1 - t0))))/irm[1, 2, numinf[ind] + 1]
-                
-            } else if(numinf[ind] == 0){
-                eventtime <- Inf
-                
-            }
-            
-        } else if(t1 == Inf){
-            
-            timeseq <- c(t0, times[times > t0 & times < t1], t1)
-            
-            for(k in 1:(length(timeseq)-1)){
-                ind <- sum(times<=timeseq[k])
-                
-                eventtime<- timeseq[k] - log(1-runif(1))/irm[1,2, numinf[ind] + 1]
-                if(eventtime < timeseq[k+1]) break
-                
-            }
-            
-        }        
-        
-    }
+    Xt <- cbind(W[,1], 0)
     
-    return(eventtime)
+    # tpm_seq returns a list whose first element is the sequence of tpms between observation times, and whose second element is a list of tpm subsequences
+    tpms <- tpm_seq(Xcount = Xcount, obstimes = W[,1], irm.eig = irm.eig)
+    emits <- emit_seq(W = W, p = p)
     
+    fbmats <- fwd(tpms = tpms[[1]], emits = emits, initdist = initdist)
+    
+    Xt[,2] <- bwd(mats = fbmats)
+    
+    path <- draw_eventtimes(Xt = Xt, Xcount = Xcount, tpm.seqs = tpms[[2]], irm = irm, tmax = tmax)    
+    
+    return(path)
 }
 
-# Forward-Backward Functions (forward, backward, drawXt) ----------------------------------------------
 
 # forward builds the forward matrices as in Scott (2002), taking as arguments an array of tpms, a matrix of emission probabilities, and an initial distribution over the state at t0
 fwd <- function(tpms, emits, initdist){
@@ -73,25 +48,6 @@ bwd <- function(mats, end.prior = c(1, 1, 1)){
     return(states)
 } 
 
-
-# drawXt draws the path for a subject conditional on the other trajectories. Calls are first made to fwd and bwd in order to draw the infection status at observation times. 
-# a call is then made to draw_subpath which samples the infection status at event times, and then samples the event times from the endpoint conditioned markov chain 
-draw_path <- function(Xcount, irm, irm.eig, W, p, initdist, tmax){
-    
-    Xt <- cbind(W[,1], 0)
-    
-    # tpm_seq returns a list whose first element is the sequence of tpms between observation times, and whose second element is a list of tpm subsequences
-    tpms <- tpm_seq(Xcount = Xcount, obstimes = W[,1], irm.eig = irm.eig)
-    emits <- emit_seq(W = W, p = p)
-    
-    fbmats <- fwd(tpms = tpms[[1]], emits = emits, initdist = initdist)
-    
-    Xt[,2] <- bwd(mats = fbmats)
-    
-    path <- draw_eventtimes(Xt = Xt, Xcount = Xcount, tpm.seqs = tpms[[2]], irm = irm)    
-    
-    return(path)
-}
 
 # draw_eventtimes takes the matrix Xt and samples the event times appropriately determining whether to call draw_subseq or to draw directly. it returns a path.
 draw_eventtimes <- function(Xt, Xcount, tpm.seqs, irm, tmax){
@@ -180,12 +136,11 @@ draw_eventtimes <- function(Xt, Xcount, tpm.seqs, irm, tmax){
                     path[2] <- drawtime(Xcount = Xcount, irm = irm, t0 = timeseq[statediffs[2]], t1 = timeseq[statediffs[2] + 1], 2)
                     
                     
-                } else if(length(statediffs == 1)){
+                } else if(length(statediffs) == 1){
                     
-                    ############# This is the case where the process jumps twice in a single interval. Wait for Vladimir's response
+                    path[1] <- drawtime(Xcount = Xcount, irm = irm, t0 = timeseq[statediffs], t1 = timeseq[statediffs+1], tpm = tpm.seq[,, statediffs, 1], 1)
                     
-                    
-                    
+                    path[2] <- drawtime(Xcount = Xcount, irm = irm, t0 = path[1], t1 = timeseq[statediffs + 1], 2)
                 }
                 
             } else if(Xt[changetimes,2]==1 & ((Xt[changetimes+1,2] - Xt[changetimes,2]) == 1)){ # healthy to infected within one observation period
@@ -234,6 +189,59 @@ draw_eventtimes <- function(Xt, Xcount, tpm.seqs, irm, tmax){
     return(path)    
 }
 
+
+# drawtime draws an event time for either carriage acquisition or clearance. Xother is a matrix with the times of acquisition and clearance
+# for all other subjects. irm is an array of instantaneous rate matrices. t0 and t1 are the left and right endpoints of the interval. 
+# current state is the infection status at t0. 
+
+drawtime <- function(Xcount, irm, t0, t1, currentstate, tpm = NULL){
+    
+    if(currentstate == 2){
+        eventtime <- t0 - log(1 - runif(1)*(1-exp(-irm[2,3,1] * (t1 - t0))))/irm[2,3,1]
+        
+    } else if(currentstate ==1){
+        times <- Xcount[,1]; numinf <- Xcount[,2]
+        
+        if(t1 != Inf){
+            ind <- sum(times <= t0)
+            
+            if(numinf[ind] != 0){
+                if(is.null(tpm)){ # the tpm is only provided when the state jumps twice in a homogeneous interval
+                    
+                    eventtime <- t0 - log(1 - runif(1)*(1 - exp(-irm[1, 2, numinf[ind] + 1]*(t1 - t0))))/irm[1, 2, numinf[ind] + 1]
+                    
+                } else if(!is.null(tpm)){
+                    
+                    prop.const <- tpm[2,3] / tpm[1,3] * irm[1, 2, numinf[ind] + 1] / (irm[1, 2, numinf[ind] + 1] - irm[2, 3, numinf[ind] + 1])
+                    eventtime <- t0 - log(1 - runif(1) / prop.const) / (irm[1, 2, numinf[ind] + 1] - irm[2, 3, numinf[ind] + 1])
+                    
+                }                    
+                
+            } else if(numinf[ind] == 0){
+                eventtime <- Inf
+                
+            }
+            
+        } else if(t1 == Inf){
+            
+            timeseq <- c(t0, times[times > t0 & times < t1], t1)
+            
+            for(k in 1:(length(timeseq)-1)){
+                ind <- sum(times<=timeseq[k])
+                
+                eventtime<- timeseq[k] - log(1-runif(1))/irm[1,2, numinf[ind] + 1]
+                if(eventtime < timeseq[k+1]) break
+                
+            }
+            
+        }        
+        
+    }
+    
+    return(eventtime)
+    
+}
+
 # draw_subseq takes a matrix with the infection status at observation times and returns a sample path by calling draw_times after sampling the infection status at event times
 draw_subseq <- function(init.state, final.state, Xcount, tpm.seq, irm){
     eventtimes <- Xcount[,1]    
@@ -241,7 +249,7 @@ draw_subseq <- function(init.state, final.state, Xcount, tpm.seq, irm){
     tpm.subseq <- tpm.seq[,,,1] # the array of tpms for the sequence of event times
     tpm.products <- tpm.seq[,,,2] # the array of products of tpms for the event times
     
-    states <- c(init.state, rep(final.state, dim(tpm.subseq)[3]))
+    states <- c(init.state, rep(final.state, dim(tpm.seq)[3]))
     
     if(length(states) >= 3){
         state.probs <- tpm.subseq[init.state, , 1] * tpm.products[ , final.state, 2] / tpm.products[init.state, final.state, 1]
