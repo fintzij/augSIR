@@ -216,14 +216,14 @@ update_Xcount <- function(Xcount.other, path){
     if(all(path == 0)){
         Xcount <- Xcount.other
         
-        Xcount[,3] <- Xcount[,3] + 1 # subject was always susceptible, so we add him from susceptible count
+        Xcount[,3] <- Xcount[,3] + 1 # subject was always susceptible, so we add him to susceptible count
         
     } else if(path[1] == 0 & path[2] != 0){# subject is initially infected and a recovery is observed
         
         ind <- sum(Xcount.other[,1] <= path[2]) + 1
         Xcount <- insertRow(Xcount.other, c(path[2], Xcount.other[ind - 1, 2:3]), ind)
         
-        Xcount[1:(ind-1), 2] <- Xcount[1:(ind -1), 2] + 1
+        Xcount[1:(ind-1), 2] <- Xcount[1:(ind -1), 2] + 1 # add subject to count of infecteds for times until his recovery. Subject was never susceptible, so no changes to susceptible count.
         
     } else if(all(path != 0)){ # if subject is not initially infected, and and infection is observed
         
@@ -269,12 +269,12 @@ get_Xcount_other <- function(Xcount, path){
     if(all(path == 0)){
         Xcount.other <- Xcount
         
-        Xcount[,3] <- Xcount[,3] - 1 # subject was always susceptible, so we remove him from susceptible count
+        Xcount.other[,3] <- Xcount.other[,3] - 1 # subject was always susceptible, so we remove him from susceptible count
         
     } else if(path[1] == 0 & path[2] != 0){# subject is initially infected and a recovery is observed
         Xcount.other <- Xcount[Xcount[,1] != path[2],] # remove the row corresponding to the recovery 
         
-        Xcount.other[,2] <- Xcount.other[,2] - (Xcount.other[,1] < path[2])
+        Xcount.other[,2] <- Xcount.other[,2] - (Xcount.other[,1] < path[2]) # remove subject from the infecteds count
         
     } else if(all(path != 0)){ # if subject is not initially infected, and and infection is observed
         Xcount.other <- Xcount[!(Xcount[,1] %in% path), ] # remove the rows corresponding to the event times for the current path. note that Inf is never in the event times, so we are not falsely removing an unobserved recovery
