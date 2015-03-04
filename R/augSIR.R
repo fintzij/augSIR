@@ -98,7 +98,7 @@ augSIR <- function(dat, sim.settings, priors, inits, returnX = FALSE) {
             obs_prob.new <- obs_prob(W.new, probs[k-1])
             obs_prob.cur <- obs_prob(W.cur, probs[k-1])
             
-            a.prob <- accept_prob(pop_prob.new = pop_prob.new, pop_prob.cur = pop_prob.cur, path_prob.cur = path_prob.cur, path_prob.new = path_prob.new)
+            a.prob <- accept_prob(pop_prob.new = pop_prob.new, pop_prob.cur = pop_prob.cur, path_prob.cur = path_prob.cur, path_prob.new = path_prob.new, obs_prob.cur = obs_prob.cur, obs_prob.new = obs_prob.new)
             
             if(min(a.prob, 0) > log(runif(1))) {
                 X.cur <- X.new

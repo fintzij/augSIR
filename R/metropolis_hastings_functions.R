@@ -2,11 +2,11 @@
 # Metropolis-Hastings Ratio related functions (accept_prob, obs_prob, cacl_loglike, path_prob, pop_prob) ----------------------
 
 # accept_prob calculates the acceptance ratio for the M-H algorithm
-accept_prob <- function(pop_prob.new, pop_prob.cur, path_prob.cur, path_prob.new){
+accept_prob <- function(pop_prob.new, pop_prob.cur, path_prob.cur, path_prob.new, obs_prob.cur, obs_prob.new){
     if(pop_prob.new == -Inf & path_prob.new == -Inf){
         -Inf
     } else{
-        pop_prob.new - pop_prob.cur + path_prob.cur - path_prob.new
+        pop_prob.new - pop_prob.cur + path_prob.cur - path_prob.new + obs_prob.cur - obs_prob.new
     }
 }
 
