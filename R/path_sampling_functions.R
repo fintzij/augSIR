@@ -60,7 +60,7 @@ draw_eventtimes <- function(Xt, Xcount, tpm.seqs, irm, tmax){
         path[1] <- 0
         
         t0 <- Xt[dim(Xt)[1], 1]; t1 <- Inf
-        path[2] <- drawtime(Xcount, irm, t0, t1, 2)
+        path[2] <- drawtime(Xcount = Xcount, irm = irm, t0 = t0, t1 = t1, currentstate = 2)
         
         if(path[2] > tmax) path[2] <- Inf
         
@@ -69,17 +69,17 @@ draw_eventtimes <- function(Xt, Xcount, tpm.seqs, irm, tmax){
     } else if(all(Xt[,2] == 1)){
         
         t0 <- Xt[dim(Xt)[1],1]; t1 <- Inf
-        path[1] <- drawtime(Xcount, irm, t0, t1, 1)
+        path[1] <- drawtime(Xcount = Xcount, irm = irm, t0 = t0, t1 = t1, currentstate = 1)
         
         if(path[1]>tmax) {
             
-            path[1] <- path[2] <- Inf
+            path <- c(0,0) # Infection does not occur before tmax
             
         } else if(path[1] <= tmax){
             
-            path[2] <- drawtime(Xcount, irm, path[1], t1, 2)
+            path[2] <- drawtime(Xcount = Xcount, irm = irm, t0 = path[1], t1 = t1, currentstate = 2)
             
-            if(path[2] > tmax) path[2] <- Inf
+            if(path[2] > tmax) path[2] <- Inf # infection occurs before tmax, but recovery does not
             
         }
         
@@ -95,15 +95,16 @@ draw_eventtimes <- function(Xt, Xcount, tpm.seqs, irm, tmax){
                 
                 tpm.seq <- tpm.seqs[[changetimes[t]]]
                 
-                t0 <- Xt[changetimes[t], 1]; t1 <- Xt[changetimes[t]+1, 1]
-                timeseq <- c(t0, Xcount[Xcount[,1]>t0 & Xcount[,1] < t1,1], t1)
+                t0 <- Xt[changetimes[t], 1]; t1 <- Xt[changetimes[t] + 1, 1]
+                timeseq <- c(t0, Xcount[Xcount[,1]>t0 & Xcount[,1] < t1, 1], t1)
                 
                 init.state <- t; final.state <- t+1
+                
                 states <- draw_subseq(init.state = init.state, final.state = final.state, Xcount = Xcount, tpm.seq = tpm.seq, irm = irm)
                 
                 ind <- which(diff(states, lag = 1) != 0)
                 
-                path[t] <- drawtime(Xcount = Xcount, irm = irm, t0 = timeseq[ind], t1 = timeseq[ind + 1], t)
+                path[t] <- drawtime(Xcount = Xcount, irm = irm, t0 = timeseq[ind], t1 = timeseq[ind + 1], currentstate = t)
                 
             }
             
@@ -113,11 +114,11 @@ draw_eventtimes <- function(Xt, Xcount, tpm.seqs, irm, tmax){
             tpm.seq <- tpm.seqs[[changetimes]]
             
             # get the sequence of event times, bookended by observation times
-            t0 <- Xt[changetimes,1]; t1 <- Xt[changetimes+1,1]
+            t0 <- Xt[changetimes, 1]; t1 <- Xt[changetimes+1, 1]
             timeseq <- c(t0, Xcount[Xcount[,1]>t0 & Xcount[,1] < t1,1], t1)
             
             
-            if((Xt[changetimes+1,2] - Xt[changetimes,2]) == 2){ ### Subject transitions from healthy to recovered within one observation period
+            if((Xt[changetimes+1, 2] - Xt[changetimes, 2]) == 2){ ### Subject transitions from healthy to recovered within one observation period
                 
                 # set initial and final states
                 init.state <- 1; final.state <- 3
@@ -138,9 +139,9 @@ draw_eventtimes <- function(Xt, Xcount, tpm.seqs, irm, tmax){
                     
                 } else if(length(statediffs) == 1){
                     
-                    path[1] <- drawtime(Xcount = Xcount, irm = irm, t0 = timeseq[statediffs], t1 = timeseq[statediffs+1], tpm = tpm.seq[,, statediffs, 1], 1)
+                    path[1] <- drawtime(Xcount = Xcount, irm = irm, t0 = timeseq[statediffs], t1 = timeseq[statediffs+1], tpm = tpm.seq[,, statediffs, 1], currentstate = 1)
                     
-                    path[2] <- drawtime(Xcount = Xcount, irm = irm, t0 = path[1], t1 = timeseq[statediffs + 1], 2)
+                    path[2] <- drawtime(Xcount = Xcount, irm = irm, t0 = path[1], t1 = timeseq[statediffs + 1], currentstate = 2)
                 }
                 
             } else if(Xt[changetimes,2]==1 & ((Xt[changetimes+1,2] - Xt[changetimes,2]) == 1)){ # healthy to infected within one observation period
@@ -155,11 +156,11 @@ draw_eventtimes <- function(Xt, Xcount, tpm.seqs, irm, tmax){
                 statediffs <- which(diff(states, lag = 1) != 0)               
                 
                 # sample the event time
-                path[1] <- drawtime(Xcount = Xcount, irm = irm, t0 = timeseq[statediffs], t1 = (timeseq[statediffs]+1), 1)
+                path[1] <- drawtime(Xcount = Xcount, irm = irm, t0 = timeseq[statediffs], t1 = (timeseq[statediffs+1]), 1)
                 
                 # set t0 and t1 and draw the recovery time
                 t0 <- Xt[dim(Xt)[1],1]; t1 <- Inf
-                path[2] <- drawtime(Xcount, irm, t0, t1, 2)
+                path[2] <- drawtime(Xcount = Xcount, irm = irm, t0 = t0, t1 = t1, currentstate = 2)
                 
                 if(path[2] > tmax) path[2] <- Inf
                 
@@ -179,16 +180,16 @@ draw_eventtimes <- function(Xt, Xcount, tpm.seqs, irm, tmax){
                 statediffs <- which(diff(states, lag = 1) != 0)               
                 
                 # sample the event time
-                path[2] <- drawtime(Xcount = Xcount, irm = irm, t0 = timeseq[statediffs], t1 = (timeseq[statediffs]+1), 2)
+                path[2] <- drawtime(Xcount = Xcount, irm = irm, t0 = timeseq[statediffs], t1 = (timeseq[statediffs+1]), currentstate = 2)
                 
             }
             
         }
-        
+            
     }   
-    return(path)    
+        rn(path)    
 }
-
+    
 
 # drawtime draws an event time for either carriage acquisition or clearance. Xother is a matrix with the times of acquisition and clearance
 # for all other subjects. irm is an array of instantaneous rate matrices. t0 and t1 are the left and right endpoints of the interval. 
@@ -213,6 +214,7 @@ drawtime <- function(Xcount, irm, t0, t1, currentstate, tpm = NULL){
                 } else if(!is.null(tpm)){
                     
                     prop.const <- tpm[2,3] / tpm[1,3] * irm[1, 2, numinf[ind] + 1] / (irm[1, 2, numinf[ind] + 1] - irm[2, 3, numinf[ind] + 1])
+                   
                     eventtime <- t0 - log(1 - runif(1) / prop.const) / (irm[1, 2, numinf[ind] + 1] - irm[2, 3, numinf[ind] + 1])
                     
                 }                    
@@ -235,9 +237,9 @@ drawtime <- function(Xcount, irm, t0, t1, currentstate, tpm = NULL){
             }
             
         }        
-        
+            
     }
-    
+        
     return(eventtime)
     
 }
@@ -270,9 +272,10 @@ draw_subseq <- function(init.state, final.state, Xcount, tpm.seq, irm){
             }
             
         }
-        
+            
     }
-    
+        
     return(states)       
     
 }
+    
