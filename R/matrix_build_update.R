@@ -210,6 +210,7 @@ updateX <- function(X, path, j){
     return(X)
 }
 
+########## Resume here. The mistake is likely in the get_Xcount_other and update_Xcount functions
 # update_Xcount updates the Xcount.other matrix with a new sample path
 update_Xcount <- function(Xcount.other, path){
     
@@ -220,10 +221,20 @@ update_Xcount <- function(Xcount.other, path){
         
     } else if(path[1] == 0 & path[2] != 0){# subject is initially infected and a recovery is observed
         
-        ind <- sum(Xcount.other[,1] <= path[2]) + 1
-        Xcount <- insertRow(Xcount.other, c(path[2], Xcount.other[ind - 1, 2:3]), ind)
-        
-        Xcount[1:(ind-1), 2] <- Xcount[1:(ind -1), 2] + 1 # add subject to count of infecteds for times until his recovery. Subject was never susceptible, so no changes to susceptible count.
+        if(path[2] != Inf){
+            
+            ind <- sum(Xcount.other[,1] <= path[2]) + 1
+            Xcount <- insertRow(Xcount.other, c(path[2], Xcount.other[ind - 1, 2:3]), ind)
+            
+            Xcount[1:(ind-1), 2] <- Xcount[1:(ind -1), 2] + 1 # add subject to count of infecteds for times until his recovery. Subject was never susceptible, so no changes to susceptible count.
+            
+        } else if(path[2] == Inf){
+            
+            Xcount <- Xcount.other
+            
+            Xcount[,2] <- Xcount[,2] + 1 # subject was always infected, so we add him to the count of infecteds for all times
+            
+        }
         
     } else if(all(path != 0)){ # if subject is not initially infected, and and infection is observed
         
@@ -233,14 +244,14 @@ update_Xcount <- function(Xcount.other, path){
         
         Xcount[1:(ind1 - 1), 3] <- Xcount[1:(ind1 - 1), 3] + 1 # add subject to the count of susceptibles for the times when he was susceptible
         
-        if(path[2] != Inf){
+        if(path[2] != Inf){ # a recovery is observed
             
             ind2 <- sum(Xcount[,1] <= path[2]) + 1
             Xcount <- insertRow(Xcount, c(path[2], Xcount[ind2 - 1, 2:3]), ind2)
             
             Xcount[ind1:(ind2-1), 2] <- Xcount[ind1:(ind2-1), 2] + 1 # add subject to the count of infecteds for the times he was infected
             
-        } else if(path[2] == Inf){
+        } else if(path[2] == Inf){ # no recovery is observed
             
             Xcount[ind1:nrow(Xcount), 2] <- Xcount[ind1:nrow(Xcount), 2] + 1 # add subject to the count of infecteds for the times he was infected
         }
