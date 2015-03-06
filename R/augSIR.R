@@ -101,7 +101,6 @@ augSIR <- function(dat, sim.settings, priors, inits, returnX = FALSE) {
                 X.cur <- X.new
                 Xcount.cur <- Xcount.new
                 W.cur <- W.new
-                popirm.cur <- popirm.new
                 pop_prob.cur <- pop_prob.new
                 accepts.k <- accepts.k + 1
             }

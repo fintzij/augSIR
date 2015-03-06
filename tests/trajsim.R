@@ -2,11 +2,11 @@
 
 # Simulate data ----------------------------------------------
 
-SIRres<-SIRsim(popsize = 200, S0 = 199, I0 = 1, b = 0.01, mu=0.5, a=0, tmax = 15, censusInterval=0.25, sampprob = 0.25, binomsamp = TRUE, returnX = TRUE)
+SIRres<-SIRsim(popsize = 200, S0 = 199, I0 = 1, b = 0.005, mu=0.5, a=0, tmax = 25, censusInterval=0.1, sampprob = 0.25, binomsamp = TRUE, returnX = TRUE)
 
-if(dim(SIRres$results)[1] < 10){
-    while(dim(SIRres$results)[1] < 10){
-        SIRres<-SIRsim(popsize = 200, S0 = 199, I0 = 1, b = 0.01, mu=0.5, a=0, tmax = 15, censusInterval=0.25, sampprob = 0.25, binomsamp = TRUE, returnX = TRUE)
+if(dim(SIRres$results)[1] < 30){
+    while(dim(SIRres$results)[1] < 30){
+        SIRres<-SIRsim(popsize = 200, S0 = 199, I0 = 1, b = 0.005, mu=0.5, a=0, tmax = 25, censusInterval=0.1, sampprob = 0.25, binomsamp = TRUE, returnX = TRUE)
         
     }
 }
@@ -18,20 +18,21 @@ dat.m <- melt(dat,id.vars="time")
 ggplot(dat.m, aes(x=time, y=value, colour=variable)) + geom_point() + theme_bw()
 
 sim.settings <- list(popsize = 200,
-                     tmax = max(dat[,1] + 1),
-                     niter = 50,
+                     tmax = max(dat[,1])+5,
+                     niter = 1000,
                      amplify = 10,
                      initdist = c(0.995, 0.005, 0))
 
-inits <- list(beta.init = 0.01 + runif(1,-0.0005, 0.0005),
+inits <- list(beta.init = 0.005 + runif(1,-0.0005, 0.0005),
               mu.init = 0.5 + runif(1, -0.005, 0.005),
               alpha.init = 0, 
               probs.init = 0.25 + runif(1,-0.005, 0.005))
 
-priors <- list(beta.prior = c(.012, 1.1),
+priors <- list(beta.prior = c(.051, 9.997),
                mu.prior = c(0.96, 1.96),
                alpha.prior = NULL,
                p.prior = c(4.5, 13.35))
+
 
 popsize <- sim.settings$popsize # size of the population; 
 tmax <- sim.settings$tmax # maximum time of observation
@@ -77,8 +78,9 @@ if(!checkpossible(X=X.cur, W=W.cur)) {
     }
 }
 
-popirm.cur <- build_irm(Xcount = Xcount.cur, b = Beta[1], m = Mu[1], a = Alpha[1], popsize = popsize, pop = TRUE)
-pop_prob.cur <- pop_prob(Xcount = Xcount.cur, irm = popirm.cur, initdist = initdist, popsize = popsize)
+pop_prob.cur <- pop_prob(Xcount = Xcount.cur, b = Beta[1], m = Mu[1], a = Alpha[1], initdist = initdist, popsize = popsize)
+
+loglik[1] <- calc_loglike(Xcount = Xcount.cur, W = W.cur, b = Beta[1], m = Mu[1], a = Alpha[1], p = probs[1], initdist = initdist, popsize = 200)
 
 # M-H sampler
 for(k in 2:niter){
@@ -94,19 +96,18 @@ for(k in 2:niter){
     for(j in 1:length(subjects)){
         
         Xother <- X.cur[X.cur[,2]!=subjects[j],]
-        Xcount.other <- build_countmat(X = Xother, popsize = popsize)
         
         path.cur <- getpath(X.cur, subjects[j])
         
-        W.other <-updateW(W = W.cur, Xcount = Xcount.other)
+        Xcount.other <- get_Xcount_other(Xcount = Xcount.cur, path = path.cur)
+        W.other <-get_W_other(W.cur = W.cur, path = path.cur)
         
-        Xt <- drawXt(Xcount = Xcount.other, irm = pathirm.cur, irm.eig = patheigen.cur, W=W.other, p=probs[k-1], initdist = initdist)
+        path.new<- draw_path(Xcount = Xcount.other, irm = pathirm.cur, irm.eig = patheigen.cur, W = W.other, p = probs[k-1], initdist = initdist, tmax = tmax)
         
-        path.new<- drawpath(Xt = Xt, Xcount = Xcount.other, irm = pathirm.cur, tmax = tmax)
+        X.new <- updateX(X = X.cur, path = path.new, j = subjects[j])
+        Xcount.new <- update_Xcount(Xcount.other = Xcount.other, path = path.new)
         
-        X.new <- updateX(X = X.cur, Xt.path = path.new, j = subjects[j]); path.new <- getpath(X = X.new, j = subjects[j])
-        Xcount.new <- build_countmat(X = X.new, popsize = popsize)
-        W.new <- updateW(W.cur,X.new)
+        W.new <- updateW(W = W.other, path = path.new)
         
         if(max(Xcount.new[,2]) == pathirm.cur[4,4,dim(pathirm.cur)[3]]){
             
@@ -117,14 +118,10 @@ for(k in 2:niter){
             
         } 
         
-        popirm.new <- build_irm(Xcount = Xcount.new, b = Beta[k-1], m = Mu[k-1], a = Alpha[k-1], popsize = popsize, pop = TRUE)
-        pop_prob.new <- pop_prob(Xcount = Xcount.new, irm = popirm.new, initdist = initdist, popsize = popsize)
+        pop_prob.new <- pop_prob(Xcount = Xcount.new, b = Beta[k-1], m = Mu[k-1], a = Alpha[k-1], initdist = initdist, popsize = popsize)
         
         path_prob.new <- path_prob(path = path.new, Xcount = Xcount.other, pathirm = pathirm.cur, initdist = initdist, tmax = tmax)
         path_prob.cur <- path_prob(path = path.cur, Xcount = Xcount.other, pathirm = pathirm.cur, initdist = initdist, tmax = tmax)
-        
-        obs_prob.new <- obs_prob(W.new, probs[k-1])
-        obs_prob.cur <- obs_prob(W.cur, probs[k-1])
         
         a.prob <- accept_prob(pop_prob.new = pop_prob.new, pop_prob.cur = pop_prob.cur, path_prob.cur = path_prob.cur, path_prob.new = path_prob.new)
         
@@ -132,7 +129,6 @@ for(k in 2:niter){
             X.cur <- X.new
             Xcount.cur <- Xcount.new
             W.cur <- W.new
-            popirm.cur <- popirm.new
             pop_prob.cur <- pop_prob.new
             accepts.k <- accepts.k + 1
         }
@@ -154,8 +150,8 @@ for(k in 2:niter){
     
     Alpha[k] <- params.new[3]
     
-    loglik[k] <- calc_loglike(Xcount = Xcount.cur, W = W.cur, irm = popirm.cur, b = Beta[k], m = Mu[k], a = Alpha[k], p = probs[k], initdist = initdist, popsize = popsize)  
-    
+    loglik[k] <- calc_loglike(Xcount = Xcount.cur, W = W.cur, b = Beta[k], m = Mu[k], a = Alpha[k], p = probs[k], initdist = initdist, popsize = popsize)  
+
     trajectories[[k]] <- Xcount.cur
     
 }
