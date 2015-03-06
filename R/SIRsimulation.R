@@ -130,6 +130,7 @@ sim_one_SIR <- function(Xcount, obstimes, b, m, initdist, tmax, returnpath = FAL
     
     if(initstate == 2){
         tau <- rexp(1, m)
+        path <- c(0,tau)
         Xt[obstimes <= tau] <- 2
         Xt[obstimes > tau] <- 3
         
