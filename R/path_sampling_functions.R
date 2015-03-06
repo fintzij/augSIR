@@ -269,12 +269,10 @@ draw_subseq <- function(init.state, final.state, Xcount, tpm.seq, irm){
                 
                 states[s] <- sample.int(n = 3, size = 1, prob = state.probs)
                 
-            }
-            
-        }
-            
+            }            
+        }            
     }
-        
+    
     return(states)       
     
 }
