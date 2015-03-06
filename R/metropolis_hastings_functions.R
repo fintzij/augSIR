@@ -17,13 +17,20 @@ obs_prob <- function(W, p){
 }
 
 # calc_loglik calculates the complete data log-likelihood
-calc_loglike <- function(Xcount, W, irm, b, m, a=0, p, initdist, popsize){
+calc_loglike <- function(Xcount, W,  b, m, a=0, p, initdist, popsize){
     indend <- dim(Xcount)[1]; init.infec <- Xcount[1,2]
     
-    events <- diff(Xcount[,2])
-    rates <- ifelse(events==1, irm[1,2,], irm[2,3,]); #rates <- pmax(0,rates)
+    numinf <- Xcount[1:(indend - 1),2]
+    numsusc <- Xcount[1:(indend - 1),3]
     
-    hazards <- irm[1,2,] + irm[2,3,] 
+    events <- diff(Xcount[,2])
+    
+    infec.rates <- (b * numinf + a) * numsusc
+    recov.rates <- m * numinf
+    
+    hazards <- infec.rates + recov.rates
+    
+    rates <- ifelse(events==1, infec.rates, recov.rates)
     
     dbinom(sum(W[,2]), sum(W[,3]), prob=p, log=TRUE) + dmultinom(c(popsize - init.infec, init.infec, 0), prob = initdist, log=TRUE) + sum(log(rates)) - sum(hazards*diff(Xcount[,1], lag = 1))
 } 
@@ -31,13 +38,20 @@ calc_loglike <- function(Xcount, W, irm, b, m, a=0, p, initdist, popsize){
 
 # pop_prob and path_prob calculate the log-probabilities of the population trajectory and the subject trajectory for use in the M-H ratio
 
-pop_prob <- function(Xcount, irm, initdist, popsize){
+pop_prob <- function(Xcount, b, m, a = 0, initdist, popsize){
     indend <- dim(Xcount)[1]; init.infec <- Xcount[1,2]
     
-    events <- diff(Xcount[,2])
-    rates <- ifelse(events==1, irm[1,2,], irm[2,3,]); #rates <- pmax(0,rates)
+    numinf <- Xcount[1:(indend - 1),2]
+    numsusc <- Xcount[1:(indend - 1),3]
     
-    hazards <- irm[1,2,] + irm[2,3,]        
+    events <- diff(Xcount[,2])
+    
+    infec.rates <- (b * numinf + a) * numsusc
+    recov.rates <- m * numinf
+    
+    hazards <- infec.rates + recov.rates
+    
+    rates <- ifelse(events==1, infec.rates, recov.rates)
     
     dmultinom(c(popsize - init.infec, init.infec, 0), prob = initdist, log=TRUE) + sum(log(rates)) - sum(hazards*diff(Xcount[,1], lag = 1))
     

@@ -50,8 +50,9 @@ augSIR <- function(dat, sim.settings, priors, inits, returnX = FALSE) {
         }
     }
     
-    popirm.cur <- build_irm(Xcount = Xcount.cur, b = Beta[1], m = Mu[1], a = Alpha[1], popsize = popsize, pop = TRUE)
-    pop_prob.cur <- pop_prob(Xcount = Xcount.cur, irm = popirm.cur, initdist = initdist, popsize = popsize)
+    pop_prob.new <- pop_prob(Xcount = Xcount.new, b = Beta[1], m = Mu[1], a = Alpha[1], initdist = initdist, popsize = popsize)
+    
+    loglik[1] <- calc_loglike(Xcount = Xcount.cur, W = W.cur, b = Beta[1], m = Mu[1], a = Alpha[1], p = probs[1], initdist = initdist, popsize = 200)
     
     # M-H sampler
     for(k in 2:niter){
@@ -75,7 +76,7 @@ augSIR <- function(dat, sim.settings, priors, inits, returnX = FALSE) {
             
             path.new<- draw_path(Xcount = Xcount.other, irm = pathirm.cur, irm.eig = patheigen.cur, W = W.other, p = probs[k-1], initdist = initdist, tmax = tmax)
             
-            X.new <- updateX(X = X.cur, path = path.new, j = subjects[j]); path.new <- getpath(X = X.new, j = subjects[j])
+            X.new <- updateX(X = X.cur, path = path.new, j = subjects[j])
             Xcount.new <- update_Xcount(Xcount.other = Xcount.other, path = path.new)
             
             W.new <- updateW(W = W.other, path = path.new)
@@ -89,16 +90,12 @@ augSIR <- function(dat, sim.settings, priors, inits, returnX = FALSE) {
                 
             } 
             
-            popirm.new <- build_irm(Xcount = Xcount.new, b = Beta[k-1], m = Mu[k-1], a = Alpha[k-1], popsize = popsize, pop = TRUE)
-            pop_prob.new <- pop_prob(Xcount = Xcount.new, irm = popirm.new, initdist = initdist, popsize = popsize)
+            pop_prob.new <- pop_prob(Xcount = Xcount.new, b = Beta[k-1], m = Mu[k-1], a = Alpha[k-1], initdist = initdist, popsize = popsize)
             
             path_prob.new <- path_prob(path = path.new, Xcount = Xcount.other, pathirm = pathirm.cur, initdist = initdist, tmax = tmax)
             path_prob.cur <- path_prob(path = path.cur, Xcount = Xcount.other, pathirm = pathirm.cur, initdist = initdist, tmax = tmax)
             
-            obs_prob.new <- obs_prob(W.new, probs[k-1])
-            obs_prob.cur <- obs_prob(W.cur, probs[k-1])
-            
-            a.prob <- accept_prob(pop_prob.new = pop_prob.new, pop_prob.cur = pop_prob.cur, path_prob.cur = path_prob.cur, path_prob.new = path_prob.new, obs_prob.cur = obs_prob.cur, obs_prob.new = obs_prob.new)
+            a.prob <- accept_prob(pop_prob.new = pop_prob.new, pop_prob.cur = pop_prob.cur, path_prob.cur = path_prob.cur, path_prob.new = path_prob.new)
             
             if(min(a.prob, 0) > log(runif(1))) {
                 X.cur <- X.new
@@ -125,7 +122,7 @@ augSIR <- function(dat, sim.settings, priors, inits, returnX = FALSE) {
         
         Alpha[k] <- params.new[3]
         
-        loglik[k] <- calc_loglike(Xcount = Xcount.cur, W = W.cur, irm = popirm.cur, b = Beta[k], m = Mu[k], a = Alpha[k], p = probs[k], initdist = initdist, popsize = popsize)  
+        loglik[k] <- calc_loglike(Xcount = Xcount.cur, W = W.cur, b = Beta[k], m = Mu[k], a = Alpha[k], p = probs[k], initdist = initdist, popsize = popsize)  
         
         if(returnX == TRUE) {
             trajectories[[k]] <- X.cur
