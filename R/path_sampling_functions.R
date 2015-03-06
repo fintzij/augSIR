@@ -156,7 +156,7 @@ draw_eventtimes <- function(Xt, Xcount, tpm.seqs, irm, tmax){
                 statediffs <- which(diff(states, lag = 1) != 0)               
                 
                 # sample the event time
-                path[1] <- drawtime(Xcount = Xcount, irm = irm, t0 = timeseq[statediffs], t1 = (timeseq[statediffs+1]), 1)
+                path[1] <- drawtime(Xcount = Xcount, irm = irm, t0 = timeseq[statediffs], t1 = (timeseq[statediffs + 1]), 1)
                 
                 # set t0 and t1 and draw the recovery time
                 t0 <- Xt[dim(Xt)[1],1]; t1 <- Inf
@@ -187,7 +187,7 @@ draw_eventtimes <- function(Xt, Xcount, tpm.seqs, irm, tmax){
         }
             
     }   
-        rn(path)    
+        return(path)    
 }
     
 
