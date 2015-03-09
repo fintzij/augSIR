@@ -137,7 +137,7 @@ sim_one_SIR <- function(Xcount, obstimes, b, m, initdist, tmax, returnpath = FAL
     Xt <- rep(1, length(obstimes))
     eventtimes <- c(Xcount[,1], tmax); numsick <- Xcount[,2]
     
-    initstate <- sample.int(3,1,prob=initdist)
+    initstate <- sample.int(n=3, size=1, prob=initdist)
     
     if(initstate == 2){
         tau <- rexp(1, m)

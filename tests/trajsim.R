@@ -2,14 +2,15 @@
 
 # Simulate data ----------------------------------------------
 
-SIRres<-SIRsim(popsize = 200, S0 = 199, I0 = 1, b = 0.005, mu=0.5, a=0, tmax = 25, censusInterval=0.1, sampprob = 0.25, binomsamp = TRUE, returnX = TRUE)
+SIRres<-SIRsim(popsize = 200, initdist = c(0.9, 0.1, 0), b = 0.005, mu=0.5, a=0, tmax = 25, censusInterval=0.1, sampprob = 0.25, binomsamp = TRUE, returnX = TRUE)
 
 if(dim(SIRres$results)[1] < 30){
     while(dim(SIRres$results)[1] < 30){
-        SIRres<-SIRsim(popsize = 200, S0 = 199, I0 = 1, b = 0.005, mu=0.5, a=0, tmax = 25, censusInterval=0.1, sampprob = 0.25, binomsamp = TRUE, returnX = TRUE)
+        SIRres<-SIRsim(popsize = 200, initdist = c(0.9, 0.1, 0), b = 0.005, mu=0.5, a=0, tmax = 25, censusInterval=0.1, sampprob = 0.25, binomsamp = TRUE, returnX = TRUE)
         
     }
 }
+
 
 # get data 
 dat <- SIRres$results
@@ -18,10 +19,10 @@ dat.m <- melt(dat,id.vars="time")
 ggplot(dat.m, aes(x=time, y=value, colour=variable)) + geom_point() + theme_bw()
 
 sim.settings <- list(popsize = 200,
-                     tmax = max(dat[,1])+5,
-                     niter = 1000,
+                     tmax = max(dat[,1])+1,
+                     niter = 50,
                      amplify = 10,
-                     initdist = c(0.995, 0.005, 0))
+                     initdist = c(0.9, 0.1, 0))
 
 inits <- list(beta.init = 0.005 + runif(1,-0.0005, 0.0005),
               mu.init = 0.5 + runif(1, -0.005, 0.005),
@@ -65,10 +66,11 @@ W.cur <- as.matrix(data.frame(time = dat$time, sampled = dat$Observed, augmented
 # matrix with event times, subject id and event codes. 
 # Event codes: 1=carriage aquired, -1=carriage infected, 0=event out of time range
 X.cur <- SIRres$trajectory
+
 # X.cur <- initializeX(W = W.cur, b = Beta[1], mu = Mu[1], a = Alpha[1], p=probs[1], amplify = amplify, tmax=20, popsize = popsize)
 Xcount.cur <- build_countmat(X = X.cur, popsize = popsize)
 # update observation matrix
-W.cur <- updateW(W = W.cur, X = X.cur)
+W.cur <- updateW(W = W.cur, Xcount = Xcount.cur)
 
 if(!checkpossible(X=X.cur, W=W.cur)) {
     while(!checkpossible(X=X.cur,W=W.cur)){
@@ -132,6 +134,14 @@ for(k in 2:niter){
             pop_prob.cur <- pop_prob.new
             accepts.k <- accepts.k + 1
         }
+
+#         if(checkpossible(Xcount.new, a=0, W = W.new)){
+#             X.cur <- X.new
+#             Xcount.cur <- Xcount.new
+#             W.cur <- W.new
+#             pop_prob.cur <- pop_prob.new
+#             accepts.k <- accepts.k + 1
+#         }
         
     }
             
@@ -159,9 +169,9 @@ for(k in 2:niter){
 results2 <- list(Beta = Beta, Mu = Mu, probs=probs, loglik = loglik, accepts = accepts, trajectories = trajectories) 
 
 
-# Results for the case with error, p=0.2  -----------------------------------------------------------------
+# Results for the case with error, p=0.25  -----------------------------------------------------------------
 
-censusInterval <- 0.25; p <- 0.25
+censusInterval <- 0.1; p <- 0.25
 trajectories2 <- list(); observations2 <- list(); likelihoods <- list()
 
 # for(k in 1:(length(results2[[6]]))){
@@ -182,7 +192,7 @@ for(k in 2:(length(trajectories))){
         obs$truth[j] <- traj[traj[,1] <= obs[j,1],2][sum(traj[,1] <= obs[j,1])]
     }
     
-    obs$sampled <- rbinom(dim(obs)[1], obs$truth, prob = 0.25)
+    obs$sampled <- rbinom(dim(obs)[1], obs$truth, prob = p)
     
     observations2[[k]] <- obs
     }
