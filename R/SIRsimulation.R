@@ -23,7 +23,8 @@ SIRsim <- function(popsize, initdist, b, mu, a=0, tmax, censusInterval, sampprob
     
     if(I0 == 0){
         while(I0 == 0){
-            I0 <- rmultinom(1, size = popsize, prob = initdist)
+            initcounts <- rmultinom(1, size = popsize, prob = initdist)[2]
+            I0 <- initcounts[2]; S0 <- initcounts[1]        
         }
     }
     
