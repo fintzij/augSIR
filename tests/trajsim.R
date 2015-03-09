@@ -2,11 +2,11 @@
 
 # Simulate data ----------------------------------------------
 
-SIRres<-SIRsim(popsize = 200, S0 = 199, I0 = 1, b = 0.005, mu=0.5, a=0, tmax = 25, censusInterval=0.1, sampprob = 0.25, binomsamp = TRUE, returnX = TRUE)
+SIRres<-SIRsim(popsize = 200, initdist = c(0.95, 0.05, 0), b = 0.005, mu=0.5, a=0, tmax = 25, censusInterval=0.25, sampprob = 0.25, binomsamp = TRUE, returnX = TRUE)
 
 if(dim(SIRres$results)[1] < 30){
     while(dim(SIRres$results)[1] < 30){
-        SIRres<-SIRsim(popsize = 200, S0 = 199, I0 = 1, b = 0.005, mu=0.5, a=0, tmax = 25, censusInterval=0.1, sampprob = 0.25, binomsamp = TRUE, returnX = TRUE)
+        SIRres<-SIRsim(popsize = 200, initdist = c(0.95, 0.05, 0), b = 0.005, mu=0.5, a=0, tmax = 25, censusInterval=0.25, sampprob = 0.25, binomsamp = TRUE, returnX = TRUE)
         
     }
 }
@@ -21,7 +21,7 @@ sim.settings <- list(popsize = 200,
                      tmax = max(dat[,1])+5,
                      niter = 1000,
                      amplify = 10,
-                     initdist = c(0.995, 0.005, 0))
+                     initdist = c(0.95, 0.05, 0))
 
 inits <- list(beta.init = 0.005 + runif(1,-0.0005, 0.0005),
               mu.init = 0.5 + runif(1, -0.005, 0.005),
@@ -68,7 +68,7 @@ X.cur <- SIRres$trajectory
 # X.cur <- initializeX(W = W.cur, b = Beta[1], mu = Mu[1], a = Alpha[1], p=probs[1], amplify = amplify, tmax=20, popsize = popsize)
 Xcount.cur <- build_countmat(X = X.cur, popsize = popsize)
 # update observation matrix
-W.cur <- updateW(W = W.cur, X = X.cur)
+W.cur <- updateW(W = W.cur, Xcount = Xcount.cur)
 
 if(!checkpossible(X=X.cur, W=W.cur)) {
     while(!checkpossible(X=X.cur,W=W.cur)){
@@ -125,13 +125,21 @@ for(k in 2:niter){
         
         a.prob <- accept_prob(pop_prob.new = pop_prob.new, pop_prob.cur = pop_prob.cur, path_prob.cur = path_prob.cur, path_prob.new = path_prob.new)
         
-        if(min(a.prob, 0) > log(runif(1))) {
-            X.cur <- X.new
-            Xcount.cur <- Xcount.new
-            W.cur <- W.new
-            pop_prob.cur <- pop_prob.new
-            accepts.k <- accepts.k + 1
-        }
+#         if(min(a.prob, 0) > log(runif(1))) {
+#             X.cur <- X.new
+#             Xcount.cur <- Xcount.new
+#             W.cur <- W.new
+#             pop_prob.cur <- pop_prob.new
+#             accepts.k <- accepts.k + 1
+#         }
+
+    if(checkpossible(Xcount.new, a=0, W = W.new)){
+        X.cur <- X.new
+        Xcount.cur <- Xcount.new
+        W.cur <- W.new
+        pop_prob.cur <- pop_prob.new
+        accepts.k <- accepts.k + 1
+    }
         
     }
             
@@ -166,7 +174,7 @@ trajectories2 <- list(); observations2 <- list(); likelihoods <- list()
 
 # for(k in 1:(length(results2[[6]]))){
 for(k in 2:(length(trajectories))){
-    if ((k%%1)==0){
+    if ((k%%50)==0){
     traj <- results2$trajectories[[k]]
     Xobs <- data.frame(time = traj[,1], 
                     infected = traj[,2], 
@@ -182,7 +190,7 @@ for(k in 2:(length(trajectories))){
         obs$truth[j] <- traj[traj[,1] <= obs[j,1],2][sum(traj[,1] <= obs[j,1])]
     }
     
-    obs$sampled <- rbinom(dim(obs)[1], obs$truth, prob = 0.25)
+    obs$sampled <- rbinom(dim(obs)[1], obs$truth, prob = p)
     
     observations2[[k]] <- obs
     }
