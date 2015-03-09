@@ -8,7 +8,7 @@ h2 <- function(mu, It){
   mu*It
 }
 
-SIRsim <- function(popsize, S0, I0, b, mu, a=0, tmax, censusInterval, sampprob, binomsamp = TRUE, returnX = FALSE) {
+SIRsim <- function(popsize, initdist, b, mu, a=0, tmax, censusInterval, sampprob, binomsamp = TRUE, returnX = FALSE) {
     
     if(binomsamp == FALSE) {
         X <- as.matrix(data.frame(time=rep(0,popsize*2), id=rep(1:popsize,each=2), event=rep(0,2*popsize), observed = rep(0,2*popsize)))
@@ -17,6 +17,16 @@ SIRsim <- function(popsize, S0, I0, b, mu, a=0, tmax, censusInterval, sampprob, 
         X <- as.matrix(data.frame(time=rep(0,popsize*2), id=rep(1:popsize,each=2), event=rep(0,2*popsize)))
         
     }
+    
+    initcounts <- rmultinom(1, size = popsize, prob = initdist)[2]
+    I0 <- initcounts[2]; S0 <- initcounts[1]
+    
+    if(I0 == 0){
+        while(I0 == 0){
+            I0 <- rmultinom(1, size = popsize, prob = initdist)
+        }
+    }
+    
     for(k in seq(1,(2*I0 - 1),by=2)){
         X[k, 3] <- 1 #record an infection, infection time for these cases is zero
         
