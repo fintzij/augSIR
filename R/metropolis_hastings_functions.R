@@ -39,12 +39,12 @@ calc_loglike <- function(Xcount, W,  b, m, a=0, p, initdist, popsize){
 # pop_prob and path_prob calculate the log-probabilities of the population trajectory and the subject trajectory for use in the M-H ratio
 
 pop_prob <- function(Xcount, b, m, a = 0, initdist, popsize){
-    indend <- dim(Xcount)[1]; init.infec <- Xcount[1,2]
+    indend <- dim(Xcount)[1]
     
     numinf <- Xcount[1:(indend - 1),2]
     numsusc <- Xcount[1:(indend - 1),3]
     
-    events <- diff(Xcount[,2])
+    events <- diff(Xcount[,2], lag = 1)
     
     infec.rates <- (b * numinf + a) * numsusc
     recov.rates <- m * numinf
@@ -53,7 +53,7 @@ pop_prob <- function(Xcount, b, m, a = 0, initdist, popsize){
     
     rates <- ifelse(events==1, infec.rates, recov.rates)
     
-    dmultinom(c(popsize - init.infec, init.infec, 0), prob = initdist, log=TRUE) + sum(log(rates)) - sum(hazards*diff(Xcount[,1], lag = 1))
+    dmultinom(c(Xcount[1,3], Xcount[1,2], 0), prob = initdist, log=TRUE) + sum(log(rates)) - sum(hazards*diff(Xcount[,1], lag = 1))
     
 }
 
@@ -66,27 +66,28 @@ path_prob <- function(path, Xcount, pathirm, initdist, tmax){
     
     if(all(path==0)){ # no infection observed
         
-        path.prob <- log(initdist[1])-sum(pathirm[1, 2, numinf[1:(indend - 1)] + 1] * timediffs)
+        path.prob <- dmultinom(c(1,0,0), prob = initdist, log = TRUE)-sum(pathirm[1, 2, numinf[1:(indend - 1)] + 1] * timediffs)
         
     } else if(path[2] > 0 & path[2] < Inf) { # subject is infected and recovery is observed
         
         if(path[1]==0){ # subject is initially infected 
             
-            path.prob <- log(initdist[2]) + log(pathirm[2,3,1]) - pathirm[2,3,1]*path[2]
+            path.prob <- dmultinom(c(0,1,0), prob = initdist, log = TRUE) + log(pathirm[2,3,1]) - pathirm[2,3,1]*path[2]
             
         } else if(path[1]!=0){ # subject is not initially infected
             
             if(times[2] > path[1]){ # no changes in number of other infecteds before subject's infection
                 
-                path.prob <- log(initdist[1]) + log(pathirm[1,2, init.infec + 1]) - pathirm[1,2, init.infec+1]*path[1] + 
+                path.prob <- dmultinom(c(1,0,0), prob = initdist, log = TRUE) + log(pathirm[1,2, init.infec + 1]) - pathirm[1,2, init.infec+1]*path[1] + 
                     log(pathirm[2,3,1]) - pathirm[2,3,1]*(path[2] - path[1])
                 
             } else if(times[2] < path[1]){ # if there is at least one change in the number of infecteds before the subject's infection
-                ind1 <- which(times < path[1])[sum(times < path[1])]
+                ind1 <- sum(times < path[1])
                 
-                path.prob <- log(initdist[1]) - sum(pathirm[1,2, numinf[1:(ind1-1)] + 1] * timediffs[1:(ind1-1)]) + 
-                    log(pathirm[1,2,numinf[ind1] + 1]) - pathirm[1,2, numinf[ind1]+1]*(path[1] - times[ind1]) + 
-                    log(pathirm[2,3,1]) - pathirm[2,3,1]*(path[2] - path[1]) 
+                path.prob <- dmultinom(c(1,0,0), prob = initdist, log = TRUE) - # contribution from initial distribution
+                    sum(pathirm[1,2, numinf[1:(ind1-1)] + 1] * timediffs[1:(ind1-1)]) + # contribution of escape probabilities before infection
+                    log(pathirm[1,2,numinf[ind1] + 1]) - pathirm[1,2, numinf[ind1]+1]*(path[1] - times[ind1]) + # contribution of infection
+                    log(pathirm[2,3,1]) - pathirm[2,3,1]*(path[2] - path[1]) # contribution of recovery
                 
             }
         }
@@ -95,18 +96,18 @@ path_prob <- function(path, Xcount, pathirm, initdist, tmax){
         
         if(path[1]==0){ # subject is initially infected 
             
-            path.prob <- log(initdist[2]) - pathirm[2,3,1]*tmax
+            path.prob <- dmultinom(c(0,1,0), prob = initdist, log = TRUE) - pathirm[2,3,1]*tmax
             
         } else if(path[1]!=0){ # subject is not initially infected
             
             if(times[2] > path[1]){ # no changes in number of infecteds before subject's infection
                 
-                path.prob <- log(initdist[1]) + log(pathirm[1,2, init.infec + 1]) - pathirm[1,2, init.infec + 1]*path[1] - pathirm[2,3,1]*(tmax - path[1])
+                path.prob <- dmultinom(c(1,0,0), prob = initdist, log = TRUE) + log(pathirm[1,2, init.infec + 1]) - pathirm[1,2, init.infec + 1]*path[1] - pathirm[2,3,1]*(tmax - path[1])
                 
             } else if(times[2] < path[1]){ # if there is at least one change in the number of infecteds before the subject's infection
                 ind1 <- which(times < path[1])[sum(times < path[1])]
                 
-                path.prob <- log(initdist[1]) - sum(pathirm[1,2, numinf[1:(ind1-1)] + 1] * timediffs[1:(ind1-1)]) + 
+                path.prob <- dmultinom(c(1,0,0), prob = initdist, log = TRUE) - sum(pathirm[1,2, numinf[1:(ind1-1)] + 1] * timediffs[1:(ind1-1)]) + 
                     log(pathirm[1,2, numinf[ind1] + 1]) - pathirm[1,2, numinf[ind1] + 1]*(path[1] - times[ind1])  -
                     pathirm[2,3,1]*(tmax - path[1])
                 

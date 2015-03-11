@@ -182,7 +182,7 @@ updateW <- function(W, Xcount, path){
         }
         
     } else if(missing(Xcount) & !all(path == 0)){ # Important note: when the path is provided, we should be updating Wother
-        W[,3] <- W[,3] + ((W[,1] >= path[1]) & (W[,1] <= path[2]))
+        W[,3] <- W[,3] + ((W[,1] >= path[1]) & (W[,1] < path[2]))
         
     }
     
@@ -219,9 +219,9 @@ update_Xcount <- function(Xcount.other, path){
         
         Xcount[,3] <- Xcount[,3] + 1 # subject was always susceptible, so we add him to susceptible count
         
-    } else if(path[1] == 0 & path[2] != 0){# subject is initially infected and a recovery is observed
+    } else if(path[1] == 0 & path[2] != 0){# subject is initially infected 
         
-        if(path[2] != Inf){
+        if(path[2] != Inf){ # and a recovery is observed
             
             ind <- sum(Xcount.other[,1] <= path[2]) + 1
             Xcount <- insertRow(Xcount.other, c(path[2], Xcount.other[ind - 1, 2:3]), ind)
