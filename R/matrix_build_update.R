@@ -266,7 +266,7 @@ update_Xcount <- function(Xcount.other, path){
 get_W_other <- function(W.cur, path){
     Wother <- W.cur
     
-    if(all(path != 0)){
+    if(!all(path == 0)){
         Wother[,3] <- Wother[,3] - ((Wother[,1] >= path[1]) & (Wother[,1] <= path[2]))
         
     }
