@@ -42,15 +42,21 @@ augSIR <- function(dat, sim.settings, priors, inits, returnX = FALSE) {
         trajectories[[1]] <- X.cur
     }
     
-    if(!checkpossible(X=X.cur, W=W.cur)) {
-        while(!checkpossible(X=X.cur,W=W.cur)){
+    pop_prob.cur <- pop_prob(Xcount = Xcount.cur, b = Beta[1], m = Mu[1], a = Alpha[1], initdist = initdist, popsize = popsize)
+    
+    if(pop_prob.cur == -Inf | any(W.cur[,2]>W.new[,3])) {
+        while(pop_prob.cur == -Inf | any(W.cur[,2]>W.new[,3])){
+            
             X.cur <- initializeX(W = W.cur, b = Beta[1], mu = Mu[1], a = Alpha[1], p=probs[1], amplify = amplify, tmax=20, popsize = popsize)
             Xcount.cur <- build_countmat(X = X.cur, popsize = popsize)
+            
             W.cur <- updateW(W = W.cur, X = X.cur)
+            
+            pop_prob.cur <- pop_prob(Xcount = Xcount.cur, b = Beta[1], m = Mu[1], a = Alpha[1], initdist = initdist, popsize = popsize)
+            
         }
     }
     
-    pop_prob.new <- pop_prob(Xcount = Xcount.new, b = Beta[1], m = Mu[1], a = Alpha[1], initdist = initdist, popsize = popsize)
     
     loglik[1] <- calc_loglike(Xcount = Xcount.cur, W = W.cur, b = Beta[1], m = Mu[1], a = Alpha[1], p = probs[1], initdist = initdist, popsize = 200)
     
@@ -92,12 +98,7 @@ augSIR <- function(dat, sim.settings, priors, inits, returnX = FALSE) {
             
             pop_prob.new <- pop_prob(Xcount = Xcount.new, b = Beta[k-1], m = Mu[k-1], a = Alpha[k-1], initdist = initdist, popsize = popsize)
             
-            path_prob.new <- path_prob(path = path.new, Xcount = Xcount.other, pathirm = pathirm.cur, initdist = initdist, tmax = tmax)
-            path_prob.cur <- path_prob(path = path.cur, Xcount = Xcount.other, pathirm = pathirm.cur, initdist = initdist, tmax = tmax)
-            
-            a.prob <- accept_prob(pop_prob.new = pop_prob.new, pop_prob.cur = pop_prob.cur, path_prob.cur = path_prob.cur, path_prob.new = path_prob.new)
-            
-            if(min(a.prob, 0) > log(runif(1))) {
+            if(pop_prob.new != -Inf & !any(W.new[,2]>W.new[,3])){
                 X.cur <- X.new
                 Xcount.cur <- Xcount.new
                 W.cur <- W.new
@@ -115,6 +116,7 @@ augSIR <- function(dat, sim.settings, priors, inits, returnX = FALSE) {
         
         # new rate parameters 
         params.new <- update_rates(Xcount = Xcount.cur, beta.prior = beta.prior, mu.prior = mu.prior, popsize = popsize)
+        
         Beta[k] <- params.new[1]
         
         Mu[k] <- params.new[2]

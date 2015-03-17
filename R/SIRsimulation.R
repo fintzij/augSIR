@@ -19,7 +19,7 @@ SIRsim <- function(popsize, initdist, b, mu, a=0, tmax, censusInterval, sampprob
     }
     
     initcounts <- rmultinom(1, size = popsize, prob = initdist)
-    I0 <- initcounts[2]; S0 <- initcounts[1]
+    S0 <- initcounts[1]; I0 <- initcounts[2]
     
     if(I0 == 0){
         while(I0 == 0){
@@ -28,10 +28,8 @@ SIRsim <- function(popsize, initdist, b, mu, a=0, tmax, censusInterval, sampprob
         }
     }
     
-    for(k in seq(1,(2*I0 - 1),by=2)){
-        X[k, 3] <- 1 #record an infection, infection time for these cases is zero
-        
-    }
+
+    X[seq(1,(2*I0 - 1),by=2), 3] <- 1 #record an infection, infection time for these cases is zero
     
     X <- X[order(X[,1],X[,3]),]
     
@@ -55,10 +53,10 @@ SIRsim <- function(popsize, initdist, b, mu, a=0, tmax, censusInterval, sampprob
         rate <- h1t + h2t
         tau <- rexp(1, rate=rate)
         
-        p <- runif(1); probs <- cumsum(c(h1t, h2t))/rate
+        event <- sample(1:2, 1, prob = c(h1t, h2t))
         iTi <- iTi + tau*infectednow
         
-        if (p <= probs[1]) { #infection happens
+        if (event == 1) { #infection happens
             timenow <- timenow + tau; infectednow <- infectednow + 1; susceptiblenow <- susceptiblenow - 1
             X[which(X[,2] == which.susc[1])[1],1] <- ifelse(timenow <= tmax, timenow, 0)
             X[which(X[,2] == which.susc[1])[1],3] <- ifelse(timenow <= tmax, 1, 0)
@@ -67,16 +65,10 @@ SIRsim <- function(popsize, initdist, b, mu, a=0, tmax, censusInterval, sampprob
             which.inf <- c(which.inf, which.susc[1]); which.susc <- which.susc[-1]; 
             X <- X[order(X[,1],X[,3]),]
             
-        } else if(p>probs[1]){ # recovery happens
-            
+        } else if(event == 2){ # recovery happens
             
             timenow <- timenow + tau; infectednow <- infectednow - 1; susceptiblenow <- susceptiblenow
-#             durations <- timenow - X[X[,3]!=0 & X[,2] %in% which.inf, 1]; durations <- cumsum(durations)/sum(durations)
-#             
-#             draw <- runif(1)
-#             
-#             whorecovers <- Position(function(x) x >= draw, durations)
-# 
+            
             whorecovers <- sample(1:length(which.inf),1)
 
             X[which(X[,2] == which.inf[whorecovers])[1],1] <- ifelse(timenow <= tmax, timenow, 0)
