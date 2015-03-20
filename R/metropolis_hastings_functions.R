@@ -38,11 +38,11 @@ calc_loglike <- function(Xcount, W,  b, m, a=0, p, initdist, popsize){
 
 # pop_prob and path_prob calculate the log-probabilities of the population trajectory and the subject trajectory for use in the M-H ratio
 
-pop_prob <- function(Xcount, b, m, a = 0, initdist, popsize){
+pop_prob <- function(Xcount, tmax, b, m, a = 0, initdist, popsize){
     indend <- dim(Xcount)[1]
     
-    numinf <- Xcount[1:(indend - 1),2]
-    numsusc <- Xcount[1:(indend - 1),3]
+    numinf <- Xcount[,2]
+    numsusc <- Xcount[,3]
     
     events <- diff(Xcount[,2], lag = 1)
     
@@ -53,7 +53,7 @@ pop_prob <- function(Xcount, b, m, a = 0, initdist, popsize){
     
     rates <- ifelse(events==1, infec.rates, recov.rates)
     
-    dmultinom(c(Xcount[1,3], Xcount[1,2], 0), prob = initdist, log=TRUE) + sum(log(rates)) - sum(hazards*diff(Xcount[,1], lag = 1))
+    dmultinom(c(Xcount[1,3], Xcount[1,2], 0), prob = initdist, log=TRUE) + sum(log(rates[1:(indend - 1)])) - sum(hazards[1:(indend - 1)]*diff(Xcount[,1], lag = 1)) - hazards[indend]*max(0,tmax - Xcount[indend,1])
     
 }
 
