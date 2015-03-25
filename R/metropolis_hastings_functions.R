@@ -17,13 +17,13 @@ obs_prob <- function(W, p){
 }
 
 # calc_loglik calculates the complete data log-likelihood
-calc_loglike <- function(Xcount, W,  b, m, a=0, p, initdist, popsize){
-    indend <- dim(Xcount)[1]; init.infec <- Xcount[1,2]
+calc_loglike <- function(Xcount, tmax, W,  b, m, a=0, p, initdist, popsize){
+    indend <- dim(Xcount)[1]
     
-    numinf <- Xcount[1:(indend - 1),2]
-    numsusc <- Xcount[1:(indend - 1),3]
+    numinf <- Xcount[,2]
+    numsusc <- Xcount[,3]
     
-    events <- diff(Xcount[,2])
+    events <- diff(Xcount[,2], lag = 1)
     
     infec.rates <- (b * numinf + a) * numsusc
     recov.rates <- m * numinf
@@ -32,7 +32,8 @@ calc_loglike <- function(Xcount, W,  b, m, a=0, p, initdist, popsize){
     
     rates <- ifelse(events==1, infec.rates, recov.rates)
     
-    dbinom(sum(W[,2]), sum(W[,3]), prob=p, log=TRUE) + dmultinom(c(popsize - init.infec, init.infec, 0), prob = initdist, log=TRUE) + sum(log(rates)) - sum(hazards*diff(Xcount[,1], lag = 1))
+    dbinom(sum(W[,2]), sum(W[,3]), prob=p, log=TRUE) + dmultinom(c(Xcount[1,3], Xcount[1,2], 0), prob = initdist, log=TRUE) + sum(log(rates[1:(indend - 1)])) - sum(hazards[1:(indend - 1)]*diff(Xcount[,1], lag = 1)) - hazards[indend]*max(0,tmax - Xcount[indend,1])
+    
 } 
 
 

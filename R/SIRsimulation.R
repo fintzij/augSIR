@@ -1,87 +1,115 @@
 # SIRsim simulates an SIR epidemic
 
-h1 <- function(a, b, St, It){
+infec_rate <- function(a, b, St, It){
   (b*It + a)*St
 }
 
-h2 <- function(mu, It){
+recov_rate <- function(mu, It){
   mu*It
 }
 
 SIRsim <- function(popsize, initdist, b, mu, a=0, tmax, censusInterval, sampprob, binomsamp = TRUE, returnX = FALSE) {
     
+    # create a matrix to store the individual level trajectories. The first column is the time of infection or recovery, the second column contains subject ids, the 
+    # third column records 1 for an infection, -1 for recovery, 0 for no event. The matrix is ordered according to time, then event (only relevant for time=0). 
+    
     if(binomsamp == FALSE) {
+        # if individuals are sampled individually, there will be another column with an indicator for whether a subject is observed
         X <- as.matrix(data.frame(time=rep(0,popsize*2), id=rep(1:popsize,each=2), event=rep(0,2*popsize), observed = rep(0,2*popsize)))
     
         } else if(binomsamp == TRUE) {
+        # binomial sampling occurs at the end, conditional on the epidemic
         X <- as.matrix(data.frame(time=rep(0,popsize*2), id=rep(1:popsize,each=2), event=rep(0,2*popsize)))
         
     }
     
+    # sample initial number of infected and susceptible individuals according to multinomial distribution
     initcounts <- rmultinom(1, size = popsize, prob = initdist)
-    S0 <- initcounts[1]; I0 <- initcounts[2]
+    susceptiblenow <- initcounts[1]; infectednow <- initcounts[2]
     
-    if(I0 == 0){
-        while(I0 == 0){
+    # if the initial number of infecteds is zero, redraw since there is no need to consider an impossible epidemic
+    if(infectednow == 0){
+        while(infectednow == 0){
             initcounts <- rmultinom(1, size = popsize, prob = initdist)
-            I0 <- initcounts[2]; S0 <- initcounts[1]        
+            infectednow <- initcounts[2]; susceptiblenow <- initcounts[1]        
         }
     }
     
 
-    X[seq(1,(2*I0 - 1),by=2), 3] <- 1 #record an infection, infection time for these cases is zero
-    
-    X <- X[order(X[,1],X[,3]),]
-    
-    h1t <- h1(a=a,b=b,St=S0,It=I0) 
-    h2t <- h2(mu=mu,It=I0)
+    X[seq(1,(2*infectednow - 1),by=2), 3] <- 1 #record an infection, infection time for these cases is zero
+        
+    # infection and recovery rates
+    infec.rate <- infec_rate(a=a, b=b, St=susceptiblenow, It=infectednow) 
+    recov.rate <- recov_rate(mu=mu, It=infectednow)
     
     keep.going <- TRUE; timenow <- 0
 
-    if(I0 != popsize){
-        which.susc <- (I0+1):popsize
+    if(infectednow != popsize){
+        which.susc <- (infectednow+1):popsize
     } else {
         which.susc <- 0
     }
     
-    which.inf <- 1:I0
-    infectednow <- I0; susceptiblenow <- S0
+    which.inf <- 1:infectednow
     
     iTi <- 0
     
     while(keep.going == TRUE){
-        rate <- h1t + h2t
-        tau <- rexp(1, rate=rate)
         
-        event <- sample(1:2, 1, prob = c(h1t, h2t))
+        # the hazard is the sum of the rate of a new infection and the rate or a new recovery
+        hazard <- infec.rate + recov.rate
+        
+        # sample the time of the next infection or recovery
+        tau <- rexp(1, rate = hazard)
+        
+        # conditional on the 
+        event <- sample.int(n = 2, size = 1, prob = c(infec.rate, recov.rate))
+        
         iTi <- iTi + tau*infectednow
         
         if (event == 1) { #infection happens
+            # update the current time, count of infecteds (by adding 1), and count of susceptibles (by subtracting 1)
             timenow <- timenow + tau; infectednow <- infectednow + 1; susceptiblenow <- susceptiblenow - 1
-            X[which(X[,2] == which.susc[1])[1],1] <- ifelse(timenow <= tmax, timenow, 0)
-            X[which(X[,2] == which.susc[1])[1],3] <- ifelse(timenow <= tmax, 1, 0)
             
-            h1t <- h1(a=a, b=b, St=susceptiblenow, It=infectednow); h2t <- h2(mu=mu, It=infectednow)
+            # assign the infection to the next susceptible individual
+            X[which(X[,2] == which.susc[1])[1],1] <- timenow # record the infection time
+            X[which(X[,2] == which.susc[1])[1],3] <- 1 # record the infection code
+            
+            # update the infection and recovery rates
+            infec.rate <- infec_rate(a=a, b=b, St=susceptiblenow, It=infectednow); recov.rate <- h2(mu=mu, It=infectednow)
+            
+            # remove the infected individual from the list of susceptibles and add him to the list of infecteds
             which.inf <- c(which.inf, which.susc[1]); which.susc <- which.susc[-1]; 
-            X <- X[order(X[,1],X[,3]),]
             
         } else if(event == 2){ # recovery happens
             
-            timenow <- timenow + tau; infectednow <- infectednow - 1; susceptiblenow <- susceptiblenow
+            # update time and count of infecteds (subtracting 1). No change to the number of susceptibles.
+            timenow <- timenow + tau; infectednow <- infectednow - 1
             
-            whorecovers <- sample(1:length(which.inf),1)
-
-            X[which(X[,2] == which.inf[whorecovers])[1],1] <- ifelse(timenow <= tmax, timenow, 0)
-            X[which(X[,2] == which.inf[whorecovers])[1],3] <- ifelse(timenow <= tmax, -1, 0)
+            # choose an individual to recover (discrete uniform over the infected individuals, by the memoryless property of exponentials and the fact that all 
+            # individuals recover at the same rate)
+            whorecovers <- sample(which.inf, 1)
             
-            h1t <- h1(a=a, b=b, St=susceptiblenow, It=infectednow); h2t <- h2(mu=mu, It=infectednow)
-            which.inf <- which.inf[-whorecovers]
-            X <- X[order(X[,1],X[,3]),]
+            # record the time and recovery status for the infected individual
+            X[which(X[,2] == whorecovers)[2],1] <- timenow #record the recovery time 
+            X[which(X[,2] == whorecovers)[2],3] <- -1 #record the recovery if it occurs before tmax
+            
+            # update infection and recovery rates
+            infec.rate <- infec_rate(a=a, b=b, St=susceptiblenow, It=infectednow); recov.rate <- recov_rate(mu=mu, It=infectednow)
+            
+            #remove recovered individual from list of infecteds
+            which.inf <- which.inf[which.inf != whorecovers]
         }
         
-        if(timenow > tmax | infectednow == 0) keep.going <- FALSE
+        # no more infected individuals, so stop
+        if(infectednow == 0) keep.going <- FALSE
     }
     
+    # censor individuals outside of observation window
+    X[X[,1] > tmax, c(1,3)] <- 0
+    X <- X[order(X[,1],X[,3]),]
+    
+    # individual level binomial sampling
     if(binomsamp == FALSE){
         wasinfected <- unique(X[which(X[,3]==1),2]); observed <- ifelse(runif(length(wasinfected))<= sampprob, 1, 0)
         for(j in 1:length(wasinfected)){
@@ -98,22 +126,38 @@ SIRsim <- function(popsize, initdist, b, mu, a=0, tmax, censusInterval, sampprob
         }
         
         
-    } else if(binomsamp == TRUE){
+    } else if(binomsamp == TRUE){ #population level binomial sampling (default)
         SIRres <- data.frame(time = seq(0, tmax, by = censusInterval),
                              Observed = 0, 
                              Truth = 0)
+        
+        # count the true number of infected individuals at each observation time
         for(k in 1:dim(SIRres)[1]){
-            SIRres$Observed[k] <- rbinom(n = 1, size = sum(X[which(X[,1] <= SIRres$time[k]),3]), prob = sampprob)
             SIRres$Truth[k] <- sum(X[which(X[,1] <= SIRres$time[k]),3])
             
         }
         
-        SIRres$Observed[1] <- max(1,SIRres$Observed[1])
+        #generate binomial samples
+        SIRres$Observed <- rbinom(n = length(SIRres$Truth), size = SIRres$Truth, prob = sampprob)
+        
+        # If first observed count is zero, resample
+        if(SIRres$Observed[1] == 0){
+            while(SIRres$Observed[1] == 0){
+                SIRres$Observed[1] <- rbinom(n = 1, size = SIRres$Truth[1], prob = sampprob)
+            }
+        }
         
     }
     
-    if(any(SIRres[,2]==0)){
-        ind <- ifelse(any(SIRres[,2]==0 & c(0, diff(SIRres[,2]))==0), which(SIRres[,2]==0 & c(0, diff(SIRres[,2]))==0), length(SIRres[,2]))
+    # Censor the observations after two consecutive observations of 0
+#     if(any(SIRres[,2]==0)){
+#         ind <- ifelse(any(SIRres[,2]==0 & c(0, diff(SIRres[,2]))==0), which(SIRres[,2]==0 & c(0, diff(SIRres[,2]))==0), length(SIRres[,2]))
+#         SIRres <- SIRres[1:ind,]
+#     }
+
+    # Get rid of the matrix after the infection has died out (no more infecteds)
+    if(any(SIRres[,3] == 0)){
+        ind <- which(SIRres[,3] == 0)[1]
         SIRres <- SIRres[1:ind,]
     }
     

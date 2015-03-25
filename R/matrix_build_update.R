@@ -205,7 +205,7 @@ updateX <- function(X, path, j){
         X[X[,2]==j,][2,1] <- path[2] ; X[X[,2]==j,][2,3] <- -1
     }
     
-    X <- X[order(X[,1]),]
+    X <- X[order(X[,1], X[,3]),]
     
     return(X)
 }
