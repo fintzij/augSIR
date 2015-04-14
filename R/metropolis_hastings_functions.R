@@ -59,11 +59,11 @@ pop_prob <- function(Xcount, tmax, b, m, a = 0, initdist, popsize){
 }
 
 
-path_prob <- function(path, Xcount, pathirm, initdist, tmax){
-    indend <- dim(Xcount)[1]; init.infec <- Xcount[1,2]
+path_prob <- function(path, Xcount.other, pathirm, initdist, tmax){
+    indend <- dim(Xcount.other)[1]; init.infec <- Xcount.other[1,2]
     
-    times <- Xcount[,1]; timediffs <- diff(times, lag = 1)
-    numinf <- Xcount[,2]
+    times <- Xcount.other[,1]; timediffs <- diff(times, lag = 1)
+    numinf <- Xcount.other[,2]
     
     if(all(path==0)){ # no infection observed
         

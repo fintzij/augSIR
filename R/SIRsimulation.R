@@ -8,7 +8,7 @@ recov_rate <- function(mu, It){
   mu*It
 }
 
-SIRsim2 <- function(popsize, initdist, b, mu, a=0, tmax, censusInterval, sampprob, returnX = FALSE) {
+SIRsim <- function(popsize, initdist, b, mu, a=0, tmax, censusInterval, sampprob, trim = TRUE, returnX = FALSE) {
     
     # create a matrix to store the individual level trajectories. The first column is the time of infection or recovery, the second column contains subject ids, the 
     # third column records 1 for an infection, -1 for recovery, 0 for no event. The matrix is ordered according to time, then event (only relevant for time=0). 
@@ -153,11 +153,14 @@ SIRsim2 <- function(popsize, initdist, b, mu, a=0, tmax, censusInterval, samppro
     }
         
 
-    # Get rid of the matrix after the infection has died out (no more infecteds)
-    if(any(SIRres[,3] == 0)){
-        ind <- which(SIRres[,3] == 0)[1]
-        SIRres <- SIRres[1:ind,]
+    # Get rid of the matrix after the infection has died out (no more infecteds) if trim == TRUE
+    if(trim == TRUE){
+        if(any(SIRres[,3] == 0)){
+            ind <- which(SIRres[,3] == 0)[1] - 1
+            SIRres <- SIRres[1:ind,]
+        }
     }
+
     
     if(returnX == FALSE){
         return(SIRres)

@@ -60,15 +60,21 @@ find.rateprior <- function(mu, sigmasq, inits){
 # X is matrix with event times, subject id and event codes. 
 # Event codes: 1=carriage aquired, -1=carriage infected, 0=event out of time range
 initializeX <- function(W, b, mu, a, p, amplify, tmax, popsize){
+    
+    # create vector of ids for subjects to be infected
     whichsick <- 1:min(popsize,floor(sum(W[,2])/p)*amplify); totalinfected <- length(whichsick)
     
+    # initialize matrix
     X <- as.matrix(data.frame(time=rep(0,popsize*2), id=rep(1:popsize,each=2), event=rep(0,2*popsize)))
+    
     
     for(k in 1:dim(W)[1]){
         if(W[k,2]!=0) {
             if(length(whichsick) < (W[k,2] - sum(X[which(X[,1]<W[k,1]),3]))){
                 numneeded <-W[k,2] - sum(X[which(X[,1]<=W[k,1]),3]) - length(whichsick); selected <- rep(0,numneeded)
+                
                 ids <- 1:popsize; ids <- ids[!ids %in% whichsick]
+                
                 for(r in 1:numneeded){
                     noexcess <- which(W[,3]<=W[,2]); noexcess.times <- W[noexcess,1]
                     keepchoosing <- TRUE
@@ -137,7 +143,9 @@ initializeX <- function(W, b, mu, a, p, amplify, tmax, popsize){
         }
     }
     
-    X<-X[order(X[,1]),]
+    X[X[,1] > tmax, c(1,3)] <- 0 # censor observations greater than tmax
+    
+    X<-X[order(X[,1]),]    
     
     return(X)
 }
