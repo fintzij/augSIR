@@ -32,7 +32,8 @@ calc_loglike <- function(Xcount, tmax, W,  b, m, a=0, p, initdist, popsize){
     
     rates <- ifelse(events==1, infec.rates, recov.rates)
     
-    dbinom(sum(W[,2]), sum(W[,3]), prob=p, log=TRUE) + dmultinom(c(Xcount[1,3], Xcount[1,2], 0), prob = initdist, log=TRUE) + sum(log(rates[1:(indend - 1)])) - sum(hazards[1:(indend - 1)]*diff(Xcount[,1], lag = 1)) - hazards[indend]*max(0,tmax - Xcount[indend,1])
+    dbinom(sum(W[,2]), sum(W[,3]), prob=p, log=TRUE) + dmultinom(c(Xcount[1,3], Xcount[1,2], 0), prob = initdist, log=TRUE) + sum(log(rates[1:(indend - 1)])) -
+        sum(hazards[1:(indend - 1)]*diff(Xcount[,1], lag = 1)) - hazards[indend]*max(0,tmax - Xcount[indend,1])
     
 } 
 

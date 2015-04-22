@@ -188,3 +188,52 @@ insertRow <- function(df, newrow, j) {
     
     return(df)
 }
+
+
+
+# Matrix consistency checks -----------------------------------------------
+
+# check_subj_pop_mats checks that the count matrix is consistent with the matrix of individual level trajectories
+
+check_subj_pop_mats <- function(X, Xcount){
+    
+    inf.vec <- rep(0, nrow(Xcount)) # vector of count of infecteds
+    susc.vec <- rep(0, nrow(Xcount)) # vector of count of susceptibles
+    
+    times <- unique(Xcount[,1]) # vector of event times
+    
+    for(m in 1:length(times)){
+        
+        inf.vec[m] <- sum(X[X[,1] <= times[m], 3]) 
+        susc.vec[m] <- popsize - sum(X[X[,1] <= times[m], 3] == 1) 
+        
+    }
+    
+    if(all(inf.vec == Xcount[,2]) & all(susc.vec == Xcount[,3])){
+        
+        return(TRUE)
+        
+    } else return(FALSE)
+}
+
+
+# check_count_obs_mats checks that the observation matrix is consistent with the matrix of counts
+
+check_count_obs_mats <- function(Xcount, W){
+    
+    obs.inf <- rep(0, nrow(W)) # vector of true number of infecteds at observation times
+    
+    times <- W[,1] # vector of observation times
+    
+    for(m in 1:length(times)){
+        
+        obs.inf[m] <- Xcount[sum(Xcount[,1] <= times[m]), 2]
+        
+    }
+    
+    if(all(obs.inf == W[,3])) {
+        
+        return(TRUE)
+        
+    } else return(FALSE)    
+}
