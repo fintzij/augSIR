@@ -33,7 +33,7 @@ SIRsim <- function(popsize, initdist, b, mu, a=0, tmax, censusInterval, sampprob
     if(infectednow == 0){
         while(infectednow == 0){
             initcounts <- rmultinom(1, size = popsize, prob = initdist)
-            infectednow <- initcounts[2]; susceptiblenow <- initcounts[1]        
+            susceptiblenow <- initcounts[1]; infectednow <- initcounts[2]       
         }
     }
     
@@ -77,14 +77,14 @@ SIRsim <- function(popsize, initdist, b, mu, a=0, tmax, censusInterval, sampprob
         
         if (event == 1) { #infection happens
             
+            # update time
+            timenow <- timenow + tau
+            
             # update the current time, count of infecteds (by adding 1), and count of susceptibles (by subtracting 1)
             infectednow <- infectednow + 1; susceptiblenow <- susceptiblenow - 1
             
             # update results matrix
-            SIRres$Truth[SIRres$time > timenow & SIRres$time <= (timenow + tau)] <- infectednow
-            
-            # update time
-            timenow <- timenow + tau
+            SIRres$Truth[SIRres$time >= timenow] <- infectednow
             
             # update the infection and recovery rates
             infec.rate <- infec_rate(a=a, b=b, St=susceptiblenow, It=infectednow); recov.rate <- recov_rate(mu=mu, It=infectednow)
@@ -102,15 +102,15 @@ SIRsim <- function(popsize, initdist, b, mu, a=0, tmax, censusInterval, sampprob
             
         } else if(event == 2){ # recovery happens
             
+            # update time
+            timenow <- timenow + tau
+            
             # update time and count of infecteds (subtracting 1). No change to the number of susceptibles.
             infectednow <- infectednow - 1
             
             # update results matrix
-            SIRres$Truth[SIRres$time > timenow & SIRres$time <= (timenow + tau)] <- infectednow
-            
-            # update time
-            timenow <- timenow + tau
-            
+            SIRres$Truth[SIRres$time >= timenow] <- infectednow
+                        
             # update infection and recovery rates
             infec.rate <- infec_rate(a=a, b=b, St=susceptiblenow, It=infectednow); recov.rate <- recov_rate(mu=mu, It=infectednow)
             
