@@ -118,7 +118,7 @@ SIRsim <- function(popsize, initdist, b, mu, a=0, tmax, censusInterval, sampprob
             if(returnX == TRUE){
                 # choose an individual to recover (discrete uniform over the infected individuals, by the memoryless property of exponentials and the fact that all 
                 # individuals recover at the same rate)
-                whorecovers <- sample(which.inf, 1)
+                whorecovers <- ifelse(length(which.inf) > 1, sample(which.inf, 1), which.inf)
                 
                 # record the time and recovery status for the infected individual
                 X[which(X[,2] == whorecovers)[2],1] <- timenow #record the recovery time 
@@ -156,7 +156,7 @@ SIRsim <- function(popsize, initdist, b, mu, a=0, tmax, censusInterval, sampprob
     # Get rid of the matrix after the infection has died out (no more infecteds) if trim == TRUE
     if(trim == TRUE){
         if(any(SIRres[,3] == 0)){
-            ind <- which(SIRres[,3] == 0)[1] - 1
+            ind <- which(SIRres[,3] == 0)[1]
             SIRres <- SIRres[1:ind,]
         }
     }
