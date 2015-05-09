@@ -197,23 +197,37 @@ insertRow <- function(df, newrow, j) {
 
 check_subj_pop_mats <- function(X, Xcount){
     
-    inf.vec <- rep(0, nrow(Xcount)) # vector of count of infecteds
-    susc.vec <- rep(0, nrow(Xcount)) # vector of count of susceptibles
-    
-    times <- unique(Xcount[,1]) # vector of event times
-    
-    for(m in 1:length(times)){
+    # in small populations, it is possible for Xcount to be a vector
+    if(is.null(dim(Xcount))){
         
-        inf.vec[m] <- sum(X[X[,1] <= times[m], 3]) 
-        susc.vec[m] <- popsize - sum(X[X[,1] <= times[m], 3] == 1) 
+        times <- Xcount[1]
+        popsize <- length(unique(X[,2]))
         
+        inf.vec <- sum(X[X[,1] <= times, 3]) 
+        susc.vec <- popsize - sum(X[X[,1] <= times[m], 3] == 1) 
+        
+        cond <- (inf.vec == Xcount[2]) & (susc.vec == Xcount[3])
+        
+    } else{
+        
+        inf.vec <- rep(0, nrow(Xcount)) # vector of count of infecteds
+        susc.vec <- rep(0, nrow(Xcount)) # vector of count of susceptibles
+        
+        times <- unique(Xcount[,1]) # vector of event times
+        popsize <- length(unique(X[,2]))
+        
+        for(m in 1:length(times)){
+            
+            inf.vec[m] <- sum(X[X[,1] <= times[m], 3]) 
+            susc.vec[m] <- popsize - sum(X[X[,1] <= times[m], 3] == 1) 
+            
+        }
+        
+        cond <- all(inf.vec == Xcount[,2]) & all(susc.vec == Xcount[,3])
     }
     
-    if(all(inf.vec == Xcount[,2]) & all(susc.vec == Xcount[,3])){
-        
-        return(TRUE)
-        
-    } else return(FALSE)
+
+    return(cond)
 }
 
 
