@@ -266,7 +266,7 @@ rjmcmc_ratio <- function(W.cur, W.new, X.cur, X.new, Xcount.cur, Xcount.new, pat
                     
                 }
                 
-            } else if(path.new[2,2] != path.cur[2,2]){ # the recovery is shifted
+            } else if(path.new[2,1] != path.cur[2,1]){ # the recovery is shifted
                 rjmcmc.ratio <- min(0, loglike_new - loglike.cur)                
                 
             }   
