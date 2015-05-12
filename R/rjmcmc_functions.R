@@ -102,13 +102,13 @@ rjmcmc_draw <- function(path.cur, Xcount.cur, j, initdist, shift.int, insert.pro
             
         } else if(event == 3){ # a shift of either the infection or recovery occurs  
             
-            if(path[1,1] == 0){ # if the subject is infected at time 0, only the recovery can be shifted
+            if(path.cur[1,1] == 0){ # if the subject is infected at time 0, only the recovery can be shifted
                 
                 epsilon <- runif(1, -shift.int, shift.int)
                 
                 path.new[2, c(1, 3)] <- c(path.cur[2, 1] + epsilon, -1)
                 
-            } else if(path[1,1] != 0){ # if the subject is not infected at time 0, select either the infection or recovery to be shifted
+            } else if(path.cur[1,1] != 0){ # if the subject is not infected at time 0, select either the infection or recovery to be shifted
                 which.shift <- sample.int(2,1) # select whether to shift the infection or the recovery
                 
                 if(which.shift == 1){ # shift the infection
