@@ -76,9 +76,9 @@ rjmcmc_draw <- function(path.cur, Xcount.cur, j, initdist, shift.int, insert.pro
                 
                 
             } else if(event == 3) { # shift the infection uniformly within an interval around the current value or to zero if that shift is available
-                dt <- runif(1, -shift.int, shift.int)
+                epsilon <- runif(1, -shift.int, shift.int)
                 
-                path.new[1, c(1,3)] <- c(path.cur[1,1] + dt, 1)
+                path.new[1, c(1,3)] <- c(path.cur[1,1] + epsilon, 1)
             }
             
         }
@@ -104,25 +104,25 @@ rjmcmc_draw <- function(path.cur, Xcount.cur, j, initdist, shift.int, insert.pro
             
             if(path[1,1] == 0){ # if the subject is infected at time 0, only the recovery can be shifted
                 
-                dt <- runif(1, -shift.int, shift.int)
+                epsilon <- runif(1, -shift.int, shift.int)
                 
-                path.new[2, c(1, 3)] <- c(path.cur[2, 1] + dt, -1)
+                path.new[2, c(1, 3)] <- c(path.cur[2, 1] + epsilon, -1)
                 
             } else if(path[1,1] != 0){ # if the subject is not infected at time 0, select either the infection or recovery to be shifted
                 which.shift <- sample.int(2,1) # select whether to shift the infection or the recovery
                 
                 if(which.shift == 1){ # shift the infection
                                             
-                    dt <- runif(1, -shift.int, shift.int)
+                    epsilon <- runif(1, -shift.int, shift.int)
                     
-                    path.new[1, c(1, 3)] <- c(path.cur[1,1] + dt , 1)
+                    path.new[1, c(1, 3)] <- c(path.cur[1,1] + epsilon , 1)
                     
                     
                 } else if(which.shift == 2){ # shift the recovery
                     
-                    dt <- runif(1, -shift.int, shift.int)
+                    epsilon <- runif(1, -shift.int, shift.int)
                     
-                    path.new[2, c(1, 3)] <- c(path.cur[2, 1] + dt, -1)
+                    path.new[2, c(1, 3)] <- c(path.cur[2, 1] + epsilon, -1)
                     
                 }
             }
@@ -292,9 +292,9 @@ rjmcmc_ratio <- function(W.cur, W.new, X.cur, X.new, Xcount.cur, Xcount.new, pat
 #             
 #             if(path.cur[1,1] == 0){ # if the infection time is 0, we can only shift away from 0
 #                 
-#                 dt <- runif(1, -shift.int, shift.int) 
+#                 epsilon <- runif(1, -shift.int, shift.int) 
 #                                 
-#                 path.new[1, c(1, 3)] <- c(path.cur[1,1] + dt , 1)
+#                 path.new[1, c(1, 3)] <- c(path.cur[1,1] + epsilon , 1)
 #                 
 #                 
 #             } else if(path.cur[1,1] != 0){
@@ -308,16 +308,16 @@ rjmcmc_ratio <- function(W.cur, W.new, X.cur, X.new, Xcount.cur, Xcount.new, pat
 #                         path.new[1, c(1,3)] <- c(0, 1)
 #                         
 #                     } else if(infec_at_0 == 1){#subject is susceptible at 0, so draw as usual
-#                         dt <- runif(1, -shift.int, shift.int)
+#                         epsilon <- runif(1, -shift.int, shift.int)
 #                         
-#                         path.new[1, c(1,3)] <- c(path.cur[1,1] + dt, 1)
+#                         path.new[1, c(1,3)] <- c(path.cur[1,1] + epsilon, 1)
 #                         
 #                     }
 #                     
 #                 } else if(0 < (path.cur[1,1] - shift.int)){ # draw a new time as usual
-#                     dt <- runif(1, -shift.int, shift.int)
+#                     epsilon <- runif(1, -shift.int, shift.int)
 #                     
-#                     path.new[1, c(1,3)] <- c(path.cur[1,1] + dt, 1)
+#                     path.new[1, c(1,3)] <- c(path.cur[1,1] + epsilon, 1)
 #                     
 #                 }
 # 
@@ -349,9 +349,9 @@ rjmcmc_ratio <- function(W.cur, W.new, X.cur, X.new, Xcount.cur, Xcount.new, pat
 #                 
 #                 if(path.cur[1,1] == 0){ # if the infection time is 0, we can only shift away
 #                     
-#                     dt <- runif(1, -shift.int, shift.int)
+#                     epsilon <- runif(1, -shift.int, shift.int)
 #                     
-#                     path.new[1, c(1, 3)] <- c(path.cur[1,1] + dt , 1)
+#                     path.new[1, c(1, 3)] <- c(path.cur[1,1] + epsilon , 1)
 #                     
 #                     
 #                 } else if(path.cur[1,1] != 0){
@@ -365,16 +365,16 @@ rjmcmc_ratio <- function(W.cur, W.new, X.cur, X.new, Xcount.cur, Xcount.new, pat
 #                             path.new[1, c(1,3)] <- c(0, 1)
 #                             
 #                         } else if(infec_at_0 == 1){#subject is susceptible at 0, so draw as usual
-#                             dt <- runif(1, -shift.int, shift.int)
+#                             epsilon <- runif(1, -shift.int, shift.int)
 #                             
-#                             path.new[1, c(1,3)] <- c(path.cur[1,1] + dt, 1)
+#                             path.new[1, c(1,3)] <- c(path.cur[1,1] + epsilon, 1)
 #                             
 #                         }
 #                         
 #                     } else if(0 < (path.cur[1,1] - shift.int)){ # draw a new time as usual
-#                         dt <- runif(1, -shift.int, shift.int)
+#                         epsilon <- runif(1, -shift.int, shift.int)
 #                         
-#                         path.new[1, c(1,3)] <- c(path.cur[1,1] + dt, 1)
+#                         path.new[1, c(1,3)] <- c(path.cur[1,1] + epsilon, 1)
 #                         
 #                     }
 #                     
@@ -382,9 +382,9 @@ rjmcmc_ratio <- function(W.cur, W.new, X.cur, X.new, Xcount.cur, Xcount.new, pat
 #                 
 #             } else if(which.shift == 2){ # shift the recovery
 #                 
-#                 dt <- runif(1, -shift.int, shift.int)
+#                 epsilon <- runif(1, -shift.int, shift.int)
 #                 
-#                 path.new[2, c(1, 3)] <- c(path.cur[2, 1] + dt, -1)
+#                 path.new[2, c(1, 3)] <- c(path.cur[2, 1] + epsilon, -1)
 #                 
 #             }
 #             
