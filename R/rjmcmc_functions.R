@@ -139,7 +139,7 @@ rjmcmc_draw <- function(path.cur, Xcount.cur, j, initdist, shift.int, insert.pro
 }
 
 # rjmcmc_ratio computes the acceptance ratio for a proposed move
-rjmcmc_ratio <- function(W.cur, W.new, X.cur, X.new, Xcount.cur, Xcount.new, path.cur, path.new, initdist, shift.int, insert.prob, remove.prob, shift.prob, samp_prob, tmax, popsize){
+rjmcmc_ratio <- function(W.cur, W.new, X.cur, X.new, Xcount.cur, Xcount.new, path.cur, path.new, initdist, shift.int, insert.prob, remove.prob, shift.prob, b, m, samp_prob, tmax, popsize){
     
     # calculate the time of epidemic death (equal to tmax if the epidemic doesn't die off in the observation window)
     
