@@ -1,7 +1,7 @@
 
 # simulate data
 
-SIRres<-SIRsim(popsize = 3, initdist = c(0.7, 0.3, 0), b = 0.5, mu=1, a=0, tmax = 3, censusInterval=0.05, sampprob = 0.25, returnX = TRUE, trim = FALSE)
+SIRres<-SIRsim(popsize = 4, initdist = c(0.7, 0.3, 0), b = 0.5, mu=1, a=0, tmax = 3, censusInterval=0.05, sampprob = 0.25, returnX = TRUE, trim = FALSE)
 
 
 # get data 
@@ -16,7 +16,7 @@ colnames(dat) <- c("time", "Observed", "Truth")
 # Settings
 sim.settings <- list(popsize = 3,
                      tmax = max(dat[,1]),
-                     niter = 10000,
+                     niter = 1000,
                      amplify = 10,
                      initdist = c(0.7, 0.3, 0))
 
@@ -87,7 +87,8 @@ for(k in 2:niter){
     if(keep.going == FALSE) break
     # Update trajectories
     if(k%%100 == 0) print(k)
-    subjects <- sample(unique(X.cur[,2]), popsize, replace=TRUE)
+#     subjects <- sample(unique(X.cur[,2]), popsize, replace=TRUE)
+    subjects <- 1:popsize
     
     pathirm.cur <- build_irm(Xcount = Xcount.cur, b = Beta[k-1], m = Mu[k-1], a = Alpha[k-1], popsize = popsize, pop = FALSE)
     patheigen.cur <- irm_decomp(pathirm.cur = pathirm.cur)

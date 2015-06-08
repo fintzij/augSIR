@@ -11,7 +11,7 @@ build_countmat <- function(X, popsize) {
     
     Xcount <- cbind(Xcount, numsusc)
     colnames(Xcount)[2] <- "numsick"
-    
+        
     return(Xcount)
     
 }

@@ -143,14 +143,14 @@ SIRsim <- function(popsize, initdist, b, mu, a=0, tmax, censusInterval, sampprob
     
     
     #generate binomial samples
-    SIRres$Observed <- rbinom(n = length(SIRres$Truth), size = SIRres$Truth, prob = sampprob)
+    SIRres$Observed <- rbinom(n = nrow(SIRres), size = SIRres$Truth, prob = sampprob)
         
     # If first observed count is zero, resample that observation
-    if(SIRres$Observed[1] == 0){
-        while(SIRres$Observed[1] == 0){
-            SIRres$Observed[1] <- rbinom(n = 1, size = SIRres$Truth[1], prob = sampprob)
-        }
-    }
+#     if(SIRres$Observed[1] == 0){
+#         while(SIRres$Observed[1] == 0){
+#             SIRres$Observed[1] <- rbinom(n = nrow(SIRres), size = SIRres$Truth[1], prob = sampprob)
+#         }
+#     }
         
 
     # Get rid of the matrix after the infection has died out (no more infecteds) if trim == TRUE

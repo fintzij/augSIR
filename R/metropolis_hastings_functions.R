@@ -18,8 +18,8 @@ obs_prob <- function(W, p){
 
 # calc_loglik calculates the complete data log-likelihood
 calc_loglike <- function(Xcount, tmax, W,  b, m, a=0, p, initdist, popsize){
-    indend <- dim(Xcount)[1]
-    
+    indend <- nrow(Xcount)
+        
     numinf <- Xcount[,2]
     numsusc <- Xcount[,3]
     
@@ -32,8 +32,7 @@ calc_loglike <- function(Xcount, tmax, W,  b, m, a=0, p, initdist, popsize){
     
     rates <- ifelse(events==1, infec.rates, recov.rates)
     
-    dbinom(sum(W[,2]), sum(W[,3]), prob=p, log=TRUE) + dmultinom(c(Xcount[1,3], Xcount[1,2], 0), prob = initdist, log=TRUE) + sum(log(rates[1:(indend - 1)])) -
-        sum(hazards[1:(indend - 1)]*diff(Xcount[,1], lag = 1)) - hazards[indend]*max(0,tmax - Xcount[indend,1])
+    dbinom(sum(W[,2]), sum(W[,3]), prob=p, log=TRUE) + dmultinom(c(Xcount[1,3], Xcount[1,2], 0), prob = initdist, log=TRUE) + sum(log(rates[1:(indend - 1)])) - sum(hazards[1:(indend - 1)]*diff(Xcount[,1], lag = 1)) - hazards[indend]*max(0,tmax - Xcount[indend,1])
     
 } 
 
@@ -122,7 +121,7 @@ path_prob <- function(path, Xcount.other, pathirm, initdist, tmax){
 
 
 # Functions to update parameters (update_rates, update_prob) ---------------------------------
-update_rates <- function(Xcount, beta.prior, mu.prior, alpha.prior = NULL, popsize){
+update_rates <- function(Xcount, beta.prior, mu.prior, alpha.prior = NULL, initdist.prior = NULL, popsize){
     indend <- dim(Xcount)[1]
     infections <- diff(Xcount[,2], lag = 1)>0; recoveries <- !infections
     
@@ -135,7 +134,11 @@ update_rates <- function(Xcount, beta.prior, mu.prior, alpha.prior = NULL, popsi
     mu.new <- rgamma(1, shape = (mu.prior[1] + sum(recoveries)), 
                      rate = mu.prior[2] + sum(numsick * timediffs))
     
-    params.new <- c(beta.new, mu.new,0)
+    initprob.new <- rbeta(1, shape1 = (initdist.prior[1] + numsick[1]), shape2 = (initdist.prior[2] + popsize - numsick[1]))
+    
+    initdist.new <- c(1-initprob.new, initprob.new, 0)
+    
+    params.new <- c(beta.new, mu.new,0, initdist.new)
     
     if(!is.null(alpha.prior)){
         alpha.new <- rgamma(1, shape = (alpha.prior[1] + sum(infections)), 
