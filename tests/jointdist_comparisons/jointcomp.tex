@@ -1,0 +1,183 @@
+\documentclass[11pt]{article}
+
+% BEGIN_FOLD
+\usepackage{graphicx}
+\usepackage{color}
+\usepackage{alltt}
+\usepackage{framed}
+\usepackage{listings}
+\usepackage{longtable}
+\usepackage[american]{babel}
+\usepackage{cancel}
+\usepackage{amsthm}
+\usepackage{amsmath}
+\usepackage{mathtools}
+\usepackage{amssymb}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{ulem}
+\usepackage[margin=0.5in]{caption}
+\usepackage{fancyhdr}
+\usepackage{natbib}
+\usepackage{fullpage}
+\usepackage{setspace}
+\usepackage{subfigure}
+\usepackage{authblk}
+\usepackage{pdfpages}
+
+\renewcommand{\headrulewidth}{0pt}
+\setlength{\topmargin}{0in}
+\setlength{\headheight}{0in}
+\setlength{\headsep}{0in}
+\setlength{\textheight}{8.5in}
+\setlength{\oddsidemargin}{0in}
+\setlength{\textwidth}{6.5in}
+\setlength{\parskip}{0pt}
+\setlength\parindent{0pt} 
+\pagestyle{fancy}
+\lhead{}
+\chead{}
+\rhead{}
+\lfoot{}
+\cfoot{\textbf{\thepage}}
+\rfoot{}
+
+\linespread{1.15}
+
+% Define custom commands
+\newcommand{\ind}[1]{\mathbf{\mathbb{I}} \left ( #1 \right )}
+\newcommand{\rp}{\mathrm{p}}
+\newcommand{\bQ}{\mathbf{\mathrm{Q}}}
+\newcommand{\bP}{\mathbf{P}}
+\newcommand{\bp}{\mathbf{p}}
+\newcommand{\rW}{\mathrm{W}}
+\newcommand{\bw}{\mathbf{w}}
+\newcommand{\bW}{\mathbf{W}}
+\newcommand{\btheta}{\boldsymbol{\theta}}
+\newcommand{\Exp}{\mathrm{E}}
+\newcommand{\bX}{\mathbf{X}}
+\newcommand{\e}{\mathrm{e}}
+\newcommand{\bx}{\mathbf{x}}
+\newcommand{\bY}{\mathbf{Y}}
+\newcommand{\by}{\mathbf{y}}
+\newcommand{\xnew}{\mathbf{x}^{\mathrm{new}}}
+\newcommand{\xcur}{\mathbf{x}^{\mathrm{cur}}}
+\newcommand{\tcb}{\textcolor{blue}}
+\newcommand{\Qo}{\mathbf{\mathrm{Q_0}}}
+\newcommand{\tcr}{\textcolor{red}}
+\newcommand{\pdiv}[2]{\frac{\partial #1}{\partial #2}}
+
+\title{Joint distribution simulation results - augSIR}
+\author{}
+%\date{\today}
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+
+% END_FOLD
+
+\begin{document}
+\maketitle
+Let $ \bx $ denote a population trajectory, $ \bx_j $ denote the trajectory for subject $ j $, and $ \by $ denote the binomial samples at observation times. Take the initial distribution for infection at time 0 to be such that all individuals are infected at time 0 with probability 1. All simulations performed with population of size four, infectivity parameter 0.5 (obviously not relevant since individuals only recover), and recovery parameter 1. 
+
+\section*{Simulation \#1 - Redraw subject \textit{j}}
+\subsection*{Details}
+For $ k = 1,\dots,K $,
+\begin{enumerate}
+	\item Draw $ \bx $ via Gillespie, and $ \by|\bx $. Save $ (\bx, \by)_{k} $. 
+	\item Discard $ \bx_j $
+	\item Draw $ \bx_j^\star $ conditional on $ \bx_{-j},\ \by $ using augSIR.
+	\item Draw $ \by^\star|\bx^\star $. Save $ (\bx^\star, \by^\star)_{k} $ 
+\end{enumerate}
+\subsection*{Results}
+
+
+\newpage
+\section*{Simulation \#2 - Redraw subject \textit{j} repeatedly, with binomial re-sampling after each redraw}
+\subsection*{Details}
+For $ k = 1,\dots,K $,
+\begin{enumerate}
+	\item Draw $ \bx^{(1)} $ via Gillespie, and $ \by^{(1)}|\bx^{(1)} $. Save $ (\bx^{(1)}, \by^{(1)})_{k} $
+	\item For $ n = 2,\dots,N $
+	\begin{enumerate}
+		\item Discard $ \bx_j^{(n-1)} $.
+		\item Draw $ \bx_j^{(n)} $ conditional on $ \bx_{-j},\ \by^{(n-1)} $ using augSIR.
+		\item Draw $ \by^{(n)}|\bx^{(n)} $
+	\end{enumerate} 
+	\item Save $ (\bx^{(N)}, \by^{(N)})_{k} $
+\end{enumerate}
+
+\subsection*{Results}
+
+\newpage
+\section*{Simulation \#3 - Redraw subject \textit{j} repeatedly, no binomial re-sampling after each redraw}
+\subsection*{Details}
+For $ k = 1,\dots,K $,
+\begin{enumerate}
+	\item Draw $ \bx^{(1)} $ via Gillespie, and $ \by^{(1)}|\bx^{(1)} $. Save $ (\bx^{(1)}, \by)_{k} $
+	\item For $ n = 2,\dots,N $
+	\begin{enumerate}
+		\item Discard $ \bx_j^{(n-1)} $.
+		\item Draw $ \bx_j^{(n)} $ conditional on $ \bx_{-j},\ \by $ using augSIR.
+	\end{enumerate} 
+	\item Save $ (\bx^{(N)}, \by)_{k} $
+\end{enumerate}
+
+\subsection*{Results}
+
+\newpage
+\section*{Simulation \#4 - Redraw all subjects once}
+\subsection*{Details}
+Let $ x_j^\prime = (\bx_1^\star,\dots,\bx_{j}^\star,\bx_{j+1},\bx_{M})$ and $ x_{-j}^\prime = (\bx_1^\star,\dots,\bx_{j-1}^\star,\bx_{j+1},\bx_{M})$, where M is the population size.\\ For $ k = 1,\dots,K $,
+\begin{enumerate}
+	\item Draw $ \bx $ via Gillespie, and $ \by|\bx $. Save $ (\bx, \by)_{k} $
+	\item For $ j = 1,\dots,4 $:
+	\begin{enumerate}
+		\item Discard $ \bx_j $
+		\item Draw $ \bx_j^{\star} $ conditional on $ \bx_{-j}^\prime,\ \by $ using augSIR
+	\end{enumerate} 
+	\item Draw $ \by^\star|\bx^\star $
+	\item Save $ (\bx^\star, \by^\star)_{k} $
+\end{enumerate}
+
+\subsection*{Results}
+\newpage
+\section{Simulation \#5 - Redraw all subjects repeatedly, with binomial re-sampling after redrawing all subjects once}
+Let $ x_j^\prime = (\bx_1^\star,\dots,\bx_{j}^\star,\bx_{j+1},\bx_{M})$ and $ x_{-j}^\prime = (\bx_1^\star,\dots,\bx_{j-1}^\star,\bx_{j+1},\bx_{M})$, where M is the population size.\\
+For $ k = 1,\dots,K $,
+\begin{enumerate}
+	\item Draw $ \bx^{(1)} $ via Gillespie, and $ \by^{(1)}|\bx^{(1)} $. Save $ (\bx^{(1)}, \by^{(1)})_{k} $
+	\item For $ n = 2,\dots,N $:
+	\begin{enumerate}
+		\item For $ j=1,\dots,4 $
+		\begin{enumerate}
+			\item Discard $ \bx_j^{(n-1)} $.
+			\item Draw $ \bx_j^{(n)} $ conditional on $ \bx_{-j}^{(n-1) \prime},\ \by^{(n-1)} $ using augSIR.
+		\end{enumerate}
+		\item Draw $ \by^{(n)}|\bx^{(n)} $
+	\end{enumerate} 
+	\item Save $ (\bx^{(N)}, \by^{(N)})_{k} $
+\end{enumerate}
+
+
+\subsection*{Results}
+
+
+\newpage
+\section*{Simulation \#6 - Redraw all subjects repeatedly, no binomial re-sampling}
+\subsection*{Details}
+Let $ x_j^\prime = (\bx_1^\star,\dots,\bx_{j}^\star,\bx_{j+1},\bx_{M})$ and $ x_{-j}^\prime = (\bx_1^\star,\dots,\bx_{j-1}^\star,\bx_{j+1},\bx_{M})$, where M is the population size.\\
+For $ k = 1,\dots,K $,
+\begin{enumerate}
+	\item Draw $ \bx^{(1)} $ via Gillespie, and $ \by|\bx^{(1)} $. Save $ (\bx^{(1)}, \by)_{k} $
+	\item For $ n = 2,\dots,N $:
+	\begin{enumerate}
+		\item For $ j=1,\dots,4 $
+		\begin{enumerate}
+			\item Discard $ \bx_j^{(n-1)} $.
+			\item Draw $ \bx_j^{(n)} $ conditional on $ \bx_{-j}^{(n-1) \prime},\ \by $ using augSIR.
+		\end{enumerate}
+	\end{enumerate} 
+	\item Save $ (\bx^{(N)}, \by)_{k} $
+\end{enumerate}
+
+\end{document}

@@ -1,0 +1,6 @@
+install.packages(c("Rcpp", "RcppArmadillo", "devtools", "ggplot2", "reshape2","foreach","doParallel"), repos = "http://cran.fhcrc.org/", lib = "/home/students/fintzij/R_Packages/")
+
+
+library(devtools, lib.loc = "/home/students/fintzij/R_Packages/")
+
+install_github("fintzij/augSIR", lib.loc = "/home/students/fintzij/R_Packages/")
