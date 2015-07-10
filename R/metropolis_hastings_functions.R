@@ -127,13 +127,14 @@ update_rates <- function(Xcount, beta.prior, mu.prior, alpha.prior = NULL, initd
     
     numsick <- Xcount[1:(indend - 1),2]; numsusc <- Xcount[1:(indend-1),3] 
     timediffs <- diff(Xcount[,1], lag = 1)
-    
+
+
     beta.new <- rgamma(1, shape = (beta.prior[1] + sum(infections)), 
                        rate = beta.prior[2] + sum(numsick * numsusc * timediffs))
     
     mu.new <- rgamma(1, shape = (mu.prior[1] + sum(recoveries)), 
                      rate = mu.prior[2] + sum(numsick * timediffs))
-    
+
     initprob.new <- rbeta(1, shape1 = (initdist.prior[1] + numsick[1]), shape2 = (initdist.prior[2] + popsize - numsick[1]))
     
     initdist.new <- c(1-initprob.new, initprob.new, 0)
@@ -148,6 +149,42 @@ update_rates <- function(Xcount, beta.prior, mu.prior, alpha.prior = NULL, initd
     }
     
     return(params.new)
+}
+
+update_rates2 <- function(Xcount, beta.prior, mu.prior, alpha.prior = NULL, init.prior = NULL, popsize){
+    indend <- dim(Xcount)[1]
+    infections <- diff(Xcount[,2], lag = 1)>0; recoveries <- !infections
+    
+    numsick <- Xcount[1:(indend - 1),2]; numsusc <- Xcount[1:(indend-1),3] 
+    timediffs <- diff(Xcount[,1], lag = 1)
+    
+    suff.stats <- c(numinfec = sum(infections), 
+                    numrecov =  sum(recoveries), 
+                    beta_suffstat = sum(numsick*numsusc*timediffs),
+                    mu_suffstat = sum(numsick*timediffs))
+    
+#     beta.new <- rgamma(1, shape = (beta.prior[1] + sum(infections)), 
+#                        rate = beta.prior[2] + sum(numsick * numsusc * timediffs))
+#     
+#     mu.new <- rgamma(1, shape = (mu.prior[1] + sum(recoveries)), 
+#                      rate = mu.prior[2] + sum(numsick * timediffs))
+    beta.new <- rgamma(1, shape = beta.prior[1]+suff.stats[1], rate = beta.prior[2] + suff.stats[3])
+    mu.new <- rgamma(1, shape = mu.prior[1] + suff.stats[2], rate = mu.prior[2] + suff.stats[4])
+    
+    initprob.new <- rbeta(1, shape1 = (init.prior[1] + numsick[1]), shape2 = (init.prior[2] + popsize - numsick[1]))
+    
+    initdist.new <- c(1-initprob.new, initprob.new, 0)
+    
+    params.new <- c(beta.new, mu.new,0, initdist.new)
+    
+    if(!is.null(alpha.prior)){
+        alpha.new <- rgamma(1, shape = (alpha.prior[1] + sum(infections)), 
+                            rate = alpha.prior[2] + sum(numsusc * timediffs))
+        
+        params.new[3] <- alpha.new
+    }
+    
+    return(list(params.new, suff.stats))
 }
 
 # update_prob updates the binomial sampling probability parameter

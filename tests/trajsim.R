@@ -11,11 +11,12 @@ censusInterval <- 0.05
 obstimes <- seq(0, tmax, by = censusInterval)
 
 # generate dataset
-# SIRres<-SIRsim(popsize = popsize, initdist = initdist, b = b, mu = m, a=0, tmax = tmax, censusInterval=censusInterval, sampprob = samp_prob, returnX = TRUE)
+SIRres<-SIRsim(popsize = popsize, initdist = initdist, b = b, mu = m, a=0, tmax = tmax, censusInterval=censusInterval, sampprob = samp_prob, returnX = TRUE)
 
 # plot dataset
 # get data 
-dat <- SIRres$results[SIRres$results[,1]%%0.1 == 0, ]
+# dat <- SIRres$results[SIRres$results[,1]%%0.1 == 0, ]
+dat <- SIRres$results
 dat.m <- melt(dat,id.vars="time")
 
 ggplot(dat.m, aes(x=time, y=value, colour=variable)) + geom_line() + theme_bw()

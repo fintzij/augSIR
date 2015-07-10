@@ -139,18 +139,22 @@ rjmcmc_draw <- function(path.cur, Xcount.cur, j, initdist, shift.int, insert.pro
 }
 
 # rjmcmc_ratio computes the acceptance ratio for a proposed move
-rjmcmc_ratio <- function(W.cur, W.new, X.cur, X.new, Xcount.cur, Xcount.new, path.cur, path.new, initdist, shift.int, insert.prob, remove.prob, shift.prob, b, m, samp_prob, tmax, popsize){
+rjmcmc_ratio <- function(W.cur, W.new, Xcount.cur, Xcount.new, path.cur, path.new, initdist, shift.int, insert.prob, remove.prob, shift.prob, b, m, samp_prob, tmax, popsize){
     
     # calculate the time of epidemic death (equal to tmax if the epidemic doesn't die off in the observation window)
     
     t_epideath <- ifelse(max(Xcount.cur[,1]) < tmax & Xcount.cur[nrow(Xcount.cur), 2] == 0, max(Xcount.cur[,1]), tmax)
     
+    loglike_new <- dbinom(sum(W.new[,2]), sum(W.new[,3]), prob = samp_prob, log = TRUE) + pop_prob(Xcount = Xcount.new, tmax = tmax, b = b, m = m, a = 0, initdist = initdist, popsize = popsize)
+    
     # determine whether the new path should be automatically rejected
-    if(path.new[1,1] > path.new[1,2] | # infection is proposed after recovery
-           path.new[1,1] < 0 | # infection is proposed before time 0
-           path.new[1,1] > t_epideath | # infection is proposed after the time of epidemic death
-           path.new[2,1] > tmax | # recovery is proposed after tmax
-           path.new[2,1] < 0){ # recovery is proposed before time 0
+    if((all(path.new[,3] %in% c(1,-1)) && 
+        path.new[path.new[,3] == 1, 1] > path.new[path.new[,3] == -1, 1]) || # infection is proposed after recovery
+           path.new[1,1] < 0 || # infection is proposed before time 0
+           path.new[1,1] > t_epideath || # infection is proposed after the time of epidemic death
+           path.new[2,1] > tmax || # recovery is proposed after tmax
+           path.new[2,1] < 0 || # recovery is proposed before time 0
+           loglike_new == -Inf){ # new population trajectory is impossible
         auto_reject <- TRUE
         
     } else{
@@ -161,8 +165,6 @@ rjmcmc_ratio <- function(W.cur, W.new, X.cur, X.new, Xcount.cur, Xcount.new, pat
     if(auto_reject == FALSE){
         
         loglike_cur <- dbinom(sum(W.cur[,2]), sum(W.cur[,3]), prob = samp_prob, log = TRUE) + pop_prob(Xcount = Xcount.cur, tmax = tmax, b = b, m = m, a = 0, initdist = initdist, popsize = popsize)
-        
-        loglike_new <- dbinom(sum(W.new[,2]), sum(W.new[,3]), prob = samp_prob, log = TRUE) + pop_prob(Xcount = Xcount.new, tmax = tmax, b = b, m = m, a = 0, initdist = initdist, popsize = popsize)
         
         # calculate acceptance ratio for the appropriate move type
         if(all(path.cur[,3] == c(0,0)) & all(path.new[,3] == c(1,0))){ # move from 0 -> 1
@@ -398,7 +400,7 @@ rjmcmc_ratio <- function(W.cur, W.new, X.cur, X.new, Xcount.cur, Xcount.new, pat
 # }
 # 
 # # rjmcmc_ratio computes the acceptance ratio for a proposed move
-# rjmcmc_ratio <- function(W.cur, W.new, X.cur, X.new, Xcount.cur, Xcount.new, path.cur, path.new, initdist, shift.int, insert.prob, remove.prob, shift.prob, samp_prob, tmax, popsize){
+# rjmcmc_ratio <- function(W.cur, W.new, Xcount.cur, Xcount.new, path.cur, path.new, initdist, shift.int, insert.prob, remove.prob, shift.prob, samp_prob, tmax, popsize){
 #     
 #     # calculate the time of epidemic death (equal to tmax if the epidemic doesn't die off in the observation window)
 #     
