@@ -143,14 +143,19 @@ tpm_seq <- function(Xcount, obstimes, irm.eig){
                                 t0 = timeseq[t],
                                 t1 = timeseq[t+1])
                 
+                # correct floating point errors leading to small negative numbers
+                if(any(tpm < 0)){
+                    tpm[tpm < 0] <- 0
+                } 
+                
                 tpm.subseq[,, t, 1] <- tpm
                 tpm.subseq[,, t, 2] <- tpm %*% tpm.subseq[,, t+1, 2]
+                
             }
         }
         
         tpms[,,s] <- tpm.subseq[,, 1, 2]
         tpm.seqs[[s]] <- tpm.subseq
-        
     }
     
     return(list(tpms, tpm.seqs))
