@@ -144,7 +144,7 @@ tpm_seq <- function(Xcount, obstimes, irm.eig){
                                 t1 = timeseq[t+1])
                 
                 # correct floating point errors leading to small negative numbers
-                if(any(tpm < 0)){
+                if(any(tpm < 0)) {
                     tpm[tpm < 0] <- 0
                 } 
                 
