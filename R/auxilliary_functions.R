@@ -54,100 +54,53 @@ find.rateprior <- function(mu, sigmasq, inits){
     return(ss)
 }
 
-# initialize_X initializes the matrix of trajectories in the population by dispersing infecteds throughout the observation period
-# dat is a matrix with observation times and counts of infecteds, mu is the recovery parameter, p is the sampling probability, amplify
-# controls the factor by which the observed number of infecteds is multiplied to get the number of initialized trajectories (up to the population size)
-# X is matrix with event times, subject id and event codes. 
-# Event codes: 1=carriage aquired, -1=carriage infected, 0=event out of time range
-initializeX <- function(W, b, mu, a, p, amplify, tmax, popsize){
+# initializeX initializes the matrix of trajectories in the population by 
+# simulating configurations of trajectories until a valid configuration of
+# trajectories is acquired
+initializeX <- function(W, b, mu, a, samp_prob, initdist, censusInterval, tmax, popsize){
     
-    # create vector of ids for subjects to be infected
-    whichsick <- 1:min(popsize,floor(sum(W[,2])/p)*amplify); totalinfected <- length(whichsick)
+    keep.going <- TRUE
     
-    # initialize matrix
-    X <- as.matrix(data.frame(time=rep(0,popsize*2), id=rep(1:popsize,each=2), event=rep(0,2*popsize)))
-    
-    
-    for(k in 1:dim(W)[1]){
-        if(W[k,2]!=0) {
-            if(length(whichsick) < (W[k,2] - sum(X[which(X[,1]<W[k,1]),3]))){
-                numneeded <-W[k,2] - sum(X[which(X[,1]<=W[k,1]),3]) - length(whichsick); selected <- rep(0,numneeded)
+    while(keep.going == TRUE){
+        
+        X <- SIRsim(popsize = popsize, initdist = initdist, b = b, mu = mu, a=0, tmax = tmax, censusInterval = censusInterval, sampprob = samp_prob, trim = TRUE, returnX = TRUE)
+        
+        obsmat <- X$results
+        trajecs <- X$trajectory
+        
+        if(nrow(obsmat) < nrow(W)){
+            
+            keep.going <- TRUE
+            
+        } else if(nrow(obsmat) == nrow(W)){
+            
+            if(all(dbinom(W[,2], obsmat[,3], samp_prob) > 0)) {
                 
-                ids <- 1:popsize; ids <- ids[!ids %in% whichsick]
+                init_config <- trajecs
+                keep.going <- FALSE
                 
-                for(r in 1:numneeded){
-                    noexcess <- which(W[,3]<=W[,2]); noexcess.times <- W[noexcess,1]
-                    keepchoosing <- TRUE
-                    while(keepchoosing==TRUE){
-                        durs <- infec_durs(X, ids)
-                        proposed <- sample(ids, 1, prob = durs) # preferentially resample individuals with long infection times for reinitialization
-                        proposed.path <- getpath(X, proposed)
-                        if(!any(proposed.path[1] < noexcess.times & proposed.path[2]>noexcess.times)){
-                            selected[r] <- proposed
-                            ids <- ids[!ids==proposed]
-                            X <- updateX(X, c(0,0), proposed)
-                            W <- updateW(W, X)
-                            keepchoosing <- FALSE
-                        } else {
-                            ids <- ids[!ids==proposed]
-                            keepchoosing<-TRUE
-                        }
-                    }
-                }
-                whichsick <- c(whichsick,selected)
+            } else {
+                keep.going <- TRUE
             }
-            if(sum(X[X[,1]<=W[k,1],3]) < W[k,2]){
-                nowsick <- sample(whichsick,max(0,W[k,2] - sum(X[X[,1]<=W[k,1],3]))); whichsick <- whichsick[-which(whichsick %in% nowsick)]
                 
-                for(j in 1:length(nowsick)){
-                    ind <- which(X[,2] == nowsick[j])
-                    if(k == 1){    
-                        X[ind,1][1] <- 0; X[ind,3][1]<-1
-                        tau <- rexp(1,rate=mu)
-                        X[ind,1][2]<-ifelse(tau>tmax,0,tau)
-                        X[ind,3][2] <- ifelse(tau>tmax,0,-1)
-                    } else{
-                        tau <- rexp(1,rate=mu); eventtime <- runif(1,0, tau)
-                        
-                        X[ind,1][1] <- max(0,W[k,1] - eventtime); X[ind,3][1] <- 1
-                        
-                        X[ind,1][2]<-ifelse((W[k,1] + (tau-eventtime - min(0,W[k,1]-eventtime)))>tmax,0,W[k,1] + (tau-eventtime- min(0,W[k,1]-eventtime)))
-                        X[ind,3][2] <- ifelse(W[k,1] + (tau-eventtime - min(0,W[k,1]-eventtime))>tmax,0,-1)
-                    }
-                }   
-            } else next          
-        }   
-    }
-    
-    if(sum(infec_durs(X,1:popsize)!=0) < totalinfected){
-        
-        X<-X[order(X[,1]),]; Xcount <- build_countmat(X = X, popsize = popsize)
-        
-        infecs_toadd <- which(infec_durs(X,1:totalinfected)==0)
-        
-        for(s in 1:length(infecs_toadd)){
-            indend <- dim(Xcount)[1]
+        } else if(nrow(obsmat) > nrow(W)){
             
-            infections <- (diff(Xcount[,2], lag = 1) == 1); recoveries <- !infections
+            obsmat <- obsmat[1:nrow(W), ]
             
-            numsick <- Xcount[,2]; numsusc <- Xcount[,3]
-            timediffs <- diff(Xcount[,1], lag = 1)
+            if(all(dbinom(W[,2], obsmat[,3], samp_prob) > 0)) {
+                
+                init_config <- trajecs
+                keep.going <- FALSE
+                
+            } else {
+                keep.going <- TRUE
+            }
             
-            irm <- build_irm(Xcount = Xcount, b = b, m = mu, a = a, popsize = popsize, pop = FALSE)
-            
-            path <- c(0,0)
-            path[1] <- drawtime(Xcount = Xcount, irm = irm, t0=0, t1=max(X[,1]), currentstate = 1)
-            path[2] <- ifelse(path[1] == Inf, Inf, drawtime(Xcount = Xcount, irm = irm, t0 = path[1], t1 = Inf, currentstate = 2))
-            
-            X <- updateX(X, path, infecs_toadd[s])
         }
+        
     }
     
-    X[X[,1] > tmax, c(1,3)] <- 0 # censor observations greater than tmax
-    
-    X<-X[order(X[,1]),]    
-    
-    return(X)
+    return(init_config)
 }
 
 # getpath extracts the current path for subject j

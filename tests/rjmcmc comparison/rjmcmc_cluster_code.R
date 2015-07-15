@@ -10,8 +10,6 @@ source("path_sampling_functions.R")
 args <- commandArgs(TRUE)
 print(args)
 
-sim_number <- as.numeric(args[1])
-
 popsize = 4; tmax = 4
 b <- 0.5 + runif(1,-0.0001, 0.0001)
 m <- 1 + runif(1, -0.0001, 0.0001)

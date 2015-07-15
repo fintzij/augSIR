@@ -1,25 +1,48 @@
-# evaluating how well the method reconstructs the true trajectory
+library(batch)
+source("augSIR.R")
+source("auxilliary_functions.R")
+source("SIRsimulation.R")
+source("rjmcmc_functions.R")
+source("matrix_build_update.R")
+source("metropolis_hastings_functions.R")
+source("path_sampling_functions.R")
 
-# set simulation parameters
-niter <- 200
-popsize = 500
-samp_prob <- 0.05 
-censusInterval <- 0.05
+# args <- commandArgs(TRUE)
+# print(args)
+# 
+# popsize <- eval(parse(text = args[1]))
+# censusInterval <- eval(parse(text = args[2]))
+# samp_prob <- eval(parse(text = args[3]))
+# resample_prop <- eval(parse(text = args[4]))
+# initialization_num <- eval(parse(text = args[5]))
+
+parseCommandArgs()
+
 tmax = 10
 b <- 5/popsize
 m <- 1
+samp_prob <- 0.5 
 initdist <- c(0.95, 0.05, 0)
-trajecs_every <- niter/50
-resample_prop <- 1
+# insert.prob = 1/3; remove.prob = 1/3; shift.prob = 1/3
+# shift.int <- 0.1
+niter <- 5000
+trajecs_every <- 50
 
 obstimes <- seq(0, tmax, by = censusInterval)
 
 set.seed(183427)
 SIRres <- SIRsim(popsize = popsize, initdist = initdist, b = b, mu = m, a=0, tmax = tmax, censusInterval = censusInterval, sampprob = samp_prob, returnX = TRUE)
 
+if(initialization_num == 1){
+    set.seed(561916)
+} else if(initialization_num == 2){
+    set.seed(683629)
+} else if(initialization_num == 3){
+    set.seed(724318)
+}
 
-
-initdist.shift <- runif(1,-0.01,0.01)
+# initdist.shift <- runif(1,-0.01,0.01)
+initdist.shift <- 0
 
 inits <- list(beta.init = b - runif(1,0,b/3),
               mu.init = m - runif(1,0,m/3),
@@ -89,20 +112,20 @@ suff.stats[1,] <- c(numinfec = sum(diff(Xcount.cur[,2], lag = 1)>0),
                     beta_suffstat = sum(Xcount.cur[1:(nrow(Xcount.cur) - 1),2]*Xcount.cur[1:(nrow(Xcount.cur)-1),3]*diff(Xcount.cur[,1], lag = 1)),
                     mu_suffstat = sum(Xcount.cur[1:(nrow(Xcount.cur) - 1),2]*diff(Xcount.cur[,1], lag = 1)))
 
-writeLines(c(""), paste(paste("augSIR_log",popsize,censusInterval,samp_prob,resample_prop,sep="_"),".txt", sep=""))
+writeLines(c(""), paste(paste("augSIR_log",popsize,censusInterval,samp_prob,resample_prop,initialization_num,sep="_"),".txt", sep=""))
 
 start.time <- Sys.time()
 # start sampler
 for(k in 2:niter){
-    
-    if(k %% 5 == 0){
-        sink(paste(paste("log",popsize,censusInterval,samp_prob,resample_prop,sep="_"),".txt", sep=""), append=TRUE)  
+
+    if(k %% 500 == 0){
+        sink(paste(paste("log",popsize,censusInterval,samp_prob,resample_prop,initialization_num,sep="_"),".txt", sep=""), append=TRUE)  
         cat(paste("Starting iteration",k,"\n"))  
         sink()
     }
     
     subjects <- sample(unique(X.cur[,2]), floor(popsize*resample_prop), replace=TRUE)
-    
+
     pathirm.cur <- build_irm(Xcount = Xcount.cur, b = Beta[k-1], m = Mu[k-1], a = Alpha[k-1], pop = FALSE)
     patheigen.cur <- irm_decomp(pathirm.cur = pathirm.cur)
     
@@ -179,7 +202,7 @@ for(k in 2:niter){
     
     p_initinfec[k] <- params.new[5]
     initdist <- params.new[4:6]
-    
+
     loglik[k] <- calc_loglike(Xcount = Xcount.cur, tmax = tmax, W = W.cur, b = Beta[k], m = Mu[k], a = Alpha[k], p = probs[k], initdist = initdist, popsize = popsize)  
     
     if(k%%trajecs_every == 0) {
@@ -192,13 +215,13 @@ total.time <- difftime(end.time, start.time)
 
 results <- list(total.time, quantities = cbind(loglik, Beta, Mu, probs, p_initinfec, suff.stats), trajectories)
 
-assign(paste("augSIR_",popsize,censusInterval,samp_prob,resample_prop,sep="_"),results)
+assign(paste("augSIR_",popsize,censusInterval,samp_prob,resample_prop,initialization_num,sep="_"),results)
 
-save(list = paste("augSIR_",popsize,censusInterval,samp_prob,resample_prop,sep="_"), file = paste(paste("augSIR_",popsize,censusInterval,samp_prob,resample_prop,sep="_"),".Rdata", sep=""))
+save(list = paste("augSIR_",popsize,censusInterval,samp_prob,resample_prop,initialization_num,sep="_"), file = paste(paste("augSIR_",popsize,censusInterval,samp_prob,resample_prop,initialization_num,sep="_"),".Rdata", sep=""))
 
 
 # plot stuff
-pdf(file = paste(paste("plots_augSIR",popsize,censusInterval,samp_prob,resample_prop,sep="_"),".pdf", sep=""))
+pdf(file = paste(paste("convcomp_plots_augSIR",popsize,censusInterval,samp_prob,resample_prop,initialization_num,sep="_"),".pdf", sep=""))
 par(mfrow = c(4,2))
 ts.plot(results[[2]][,2]); plot(density(results[[2]][,2])); abline(v = b, col = "red", main = "Beta")
 ts.plot(results[[2]][,3]); plot(density(results[[2]][,3])); abline(v = m, col = "red", main = "Mu")
@@ -208,38 +231,38 @@ ts.plot(results[[2]][,5]); plot(density(results[[2]][,5])); abline(v = 0.05, col
 par(mfrow = c(1,1))
 pairs(results[[2]][,2:5])
 ts.plot(loglik, main = "log-likelihood", xlab = "iteration")
-
-truetrajec <- data.frame(time = unique(SIRres$trajectory[,1]), 
-                         infected = c(sum(SIRres$trajectory[SIRres$trajectory[,1]==0,3]), sum(SIRres$trajectory[SIRres$trajectory[,1]==0,3]) + cumsum(SIRres$trajectory[SIRres$trajectory[,1]!=0,3])),
-                         simnum = 0)
-
-trajectories <- results[[3]]
-trajectories2 <- list(); observations2 <- list()
-for(k in 1:length(results[[3]])){
-    if ((k%%1)==0){
-        traj <- trajectories[[k]]
-        Xobs <- data.frame(time = traj[,1], 
-                           infected = traj[,2], 
-                           simnum = k)
-        trajectories2[[k]] <- Xobs
-        
-        obs <- data.frame(time = seq(0,max(Xobs$time),by=censusInterval), 
-                          truth = 0, 
-                          sampled = 0, 
-                          simnum = k)
-        
-        for(j in 1:dim(obs)[1]){
-            obs$truth[j] <- traj[traj[,1] <= obs[j,1],2][sum(traj[,1] <= obs[j,1])]
+    
+    truetrajec <- data.frame(time = unique(SIRres$trajectory[,1]), 
+                             infected = c(sum(SIRres$trajectory[SIRres$trajectory[,1]==0,3]), sum(SIRres$trajectory[SIRres$trajectory[,1]==0,3]) + cumsum(SIRres$trajectory[SIRres$trajectory[,1]!=0,3])),
+                             simnum = 0)
+    
+    trajectories <- results[[3]]
+    trajectories2 <- list(); observations2 <- list()
+    for(k in 1:length(results[[3]])){
+        if ((k%%1)==0){
+            traj <- trajectories[[k]]
+            Xobs <- data.frame(time = traj[,1], 
+                               infected = traj[,2], 
+                               simnum = k)
+            trajectories2[[k]] <- Xobs
+            
+            obs <- data.frame(time = seq(0,max(Xobs$time),by=censusInterval), 
+                              truth = 0, 
+                              sampled = 0, 
+                              simnum = k)
+            
+            for(j in 1:dim(obs)[1]){
+                obs$truth[j] <- traj[traj[,1] <= obs[j,1],2][sum(traj[,1] <= obs[j,1])]
+            }
+            
+            obs$sampled <- rbinom(dim(obs)[1], obs$truth, prob = samp_prob)
+            
+            observations2[[k]] <- obs
         }
         
-        obs$sampled <- rbinom(dim(obs)[1], obs$truth, prob = samp_prob)
-        
-        observations2[[k]] <- obs
     }
+    trajecs <- data.frame(do.call(rbind,trajectories2))
     
-}
-trajecs <- data.frame(do.call(rbind,trajectories2))
-
-print(ggplot(data = trajecs, aes(x = time, y = infected, group = simnum)) + geom_path(alpha = 0.3) + geom_path(data = truetrajec, aes(x = time, y = infected),colour="red", size = 1)  + geom_point(data=data.frame(SIRres$results,simnum=0), aes(x=time,y=Observed),size=4,colour="blue") + theme_bw() + scale_x_continuous(limits = c(0, tmax)))
+    print(ggplot(data = trajecs, aes(x = time, y = infected, group = simnum)) + geom_path(alpha = 0.3) + geom_path(data = truetrajec, aes(x = time, y = infected),colour="red", size = 1)  + geom_point(data=data.frame(SIRres$results,simnum=0), aes(x=time,y=Observed),size=4,colour="blue") + theme_bw() + scale_x_continuous(limits = c(0, tmax)))
 
 dev.off()

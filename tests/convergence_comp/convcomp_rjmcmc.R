@@ -1,23 +1,45 @@
-# evaluating how well the method reconstructs the true trajectory
+library(batch)
+source("augSIR.R")
+source("auxilliary_functions.R")
+source("SIRsimulation.R")
+source("rjmcmc_functions.R")
+source("matrix_build_update.R")
+source("metropolis_hastings_functions.R")
+source("path_sampling_functions.R")
 
-# set simulation parameters
-niter <- 200
-popsize = 500
-samp_prob <- 0.05 
-censusInterval <- 0.05
+# args <- commandArgs(TRUE)
+# print(args)
+# 
+# popsize <- eval(parse(text = args[1]))
+# censusInterval <- eval(parse(text = args[2]))
+# samp_prob <- eval(parse(text = args[3]))
+# resample_prop <- eval(parse(text = args[4]))
+# initialization_num <- eval(parse(text = args[5]))
+
+parseCommandArgs()
+
 tmax = 10
 b <- 5/popsize
 m <- 1
+samp_prob <- 0.5 
 initdist <- c(0.95, 0.05, 0)
-trajecs_every <- niter/50
-resample_prop <- 1
+insert.prob = 1/3; remove.prob = 1/3; shift.prob = 1/3
+shift.int <- 0.1
+niter <- 25000
+trajecs_every <- 250
 
 obstimes <- seq(0, tmax, by = censusInterval)
 
 set.seed(183427)
-SIRres <- SIRsim(popsize = popsize, initdist = initdist, b = b, mu = m, a=0, tmax = tmax, censusInterval = censusInterval, sampprob = samp_prob, returnX = TRUE)
+SIRres<-SIRsim(popsize = popsize, initdist = initdist, b = b, mu = m, a=0, tmax = tmax, censusInterval=censusInterval, sampprob = samp_prob, returnX = TRUE)
 
-
+if(initialization_num == 1){
+    set.seed(561916)
+} else if(initialization_num == 2){
+    set.seed(683629)
+} else if(initialization_num == 3){
+    set.seed(724318)
+}
 
 initdist.shift <- runif(1,-0.01,0.01)
 
@@ -28,7 +50,7 @@ inits <- list(beta.init = b - runif(1,0,b/3),
               initdist.init = initdist + c(initdist.shift,-initdist.shift,0))
 
 # priors
-priors <- list(beta.prior = c(5/popsize + runif(1,-0.1/popsize,0.1/popsize), 0.001),
+priors <- list(beta.prior = c(5/popsize^2 + runif(1,-0.1/popsize,0.1/popsize), 0.001),
                mu.prior = c(0.001, 0.001),
                alpha.prior = NULL,
                p.prior = c(1,1),
@@ -60,14 +82,10 @@ init.prior <- priors$init.prior
 loglik <- vector(length=niter)
 
 # list to store trajectories
-trajectories <- vector(mode = "list", length = 1 + niter/trajecs_every)
+trajectories <- vector(mode = "list", length = 100)
 
 # observation matrix
 W.cur <- as.matrix(data.frame(time = SIRres$results$time, sampled = SIRres$results$Observed, augmented = 0))
-
-# set initial distribution
-initdist <- c(1 - W.cur[1,2]/probs[1]/popsize, W.cur[1,2]/probs[1]/popsize, 0)
-p_initinfec[1] <- initdist[2]
 
 # individual trajectories
 X.cur <- initializeX(W = W.cur, b = Beta[1], mu = Mu[1], a = Alpha[1], samp_prob = probs[1], initdist = initdist, censusInterval = censusInterval, tmax = tmax, popsize = popsize)
@@ -77,11 +95,17 @@ Xcount.cur <- build_countmat(X = X.cur, popsize = popsize)
 
 trajectories[[1]] <- Xcount.cur
 
+
 # update observation matrix
 W.cur <- updateW(W = W.cur, Xcount = Xcount.cur)
 
+
 # calculate likelihood for initial trajectory
 loglik[1] <- calc_loglike(Xcount = Xcount.cur, tmax = tmax, W = W.cur, b = Beta[1], m = Mu[1], a = Alpha[1], p = probs[1], initdist = initdist, popsize = popsize)
+
+# set initial distribution
+initdist <- c(1-W.cur[1,2]/probs[1]/popsize, W.cur[1,2]/probs[1]/popsize, 0)
+p_initinfec[1] <- initdist[2]
 
 # calculate sufficient statistics for initialization
 suff.stats[1,] <- c(numinfec = sum(diff(Xcount.cur[,2], lag = 1)>0), 
@@ -89,74 +113,61 @@ suff.stats[1,] <- c(numinfec = sum(diff(Xcount.cur[,2], lag = 1)>0),
                     beta_suffstat = sum(Xcount.cur[1:(nrow(Xcount.cur) - 1),2]*Xcount.cur[1:(nrow(Xcount.cur)-1),3]*diff(Xcount.cur[,1], lag = 1)),
                     mu_suffstat = sum(Xcount.cur[1:(nrow(Xcount.cur) - 1),2]*diff(Xcount.cur[,1], lag = 1)))
 
-writeLines(c(""), paste(paste("augSIR_log",popsize,censusInterval,samp_prob,resample_prop,sep="_"),".txt", sep=""))
+writeLines(c(""), paste(paste("rjmcmc_log",popsize,censusInterval,samp_prob,resample_prop,initialization_num,sep="_"),".txt", sep=""))
 
 start.time <- Sys.time()
 # start sampler
 for(k in 2:niter){
     
-    if(k %% 5 == 0){
-        sink(paste(paste("log",popsize,censusInterval,samp_prob,resample_prop,sep="_"),".txt", sep=""), append=TRUE)  
+    if(k %% 2500 == 0){
+        sink(paste(paste("log",popsize,censusInterval,samp_prob,resample_prop,initialization_num,sep="_"),".txt", sep=""), append=TRUE)  
         cat(paste("Starting iteration",k,"\n"))  
         sink()
     }
     
     subjects <- sample(unique(X.cur[,2]), floor(popsize*resample_prop), replace=TRUE)
+    # subjects <- 1:popsize
     
     pathirm.cur <- build_irm(Xcount = Xcount.cur, b = Beta[k-1], m = Mu[k-1], a = Alpha[k-1], pop = FALSE)
     patheigen.cur <- irm_decomp(pathirm.cur = pathirm.cur)
-    
-    pop_prob.cur <- pop_prob(Xcount = Xcount.cur, tmax = tmax, b = Beta[1], m = Mu[1], a = Alpha[1], initdist = initdist, popsize = popsize)
     
     accepts.k <- 0
     
     # redraw individuals
     for(j in 1:length(subjects)){
-        # get current path
-        path.cur <- getpath(X.cur, subjects[j])
         
-        # get .other matrices
-        Xother <- X.cur[X.cur[,2]!=subjects[j],]
-        Xcount.other <- build_countmat(Xother, popsize - 1)
-        W.other <- get_W_other(W.cur = W.cur, path = path.cur)
+        path.cur <- X.cur[X.cur[,2] == subjects[j], ]
+        path.new <- rjmcmc_draw(path.cur = path.cur, Xcount.cur, j = subjects[j], initdist = initdist, shift.int = shift.int, insert.prob = insert.prob, remove.prob = remove.prob, shift.prob = shift.prob, tmax = max(W.cur[,1]), b = b, m = m, p = samp_prob)
         
-        # draw new path
-        path.new <- draw_path(Xcount = Xcount.other, irm = pathirm.cur, irm.eig = patheigen.cur, W = W.other, p = samp_prob, initdist = initdist, tmax = tmax)
-        
-        # generate .new objects
-        X.new <- updateX(X = X.cur, path = path.new, j = subjects[j])
-        Xcount.new <- update_Xcount(Xcount.other = Xcount.other, path = path.new)
-        W.new <- updateW(W = W.other, path = path.new)
-        
-        # check if update is needed to path.irm
-        if(max(Xcount.new[,2]) == pathirm.cur[4,4,dim(pathirm.cur)[3]]){
-            
-            new.numinf <- pathirm.cur[4,4,dim(pathirm.cur)[3]]+1
-            
-            pathirm.cur <- update_irm(irm = pathirm.cur, new.numinf = new.numinf, b = Beta[k-1], m = Mu[k-1], a = Alpha[k-1], popsize = popsize)
-            patheigen.cur <- update_eigen(patheigen = patheigen.cur, pathirm = pathirm.cur)
-            
+        if(all(path.cur[,3] == c(-1,1))) {
+            cat(k,j,"BAD PATH CUR!")
+            print(path.cur)
         }
         
-        # Metropolis-Hastings 
-        # population trajectory likelihoods 
-        pop_prob.new <- pop_prob(Xcount = Xcount.new, tmax = tmax, b = b, m = m, a = 0, initdist = initdist, popsize = popsize)
+        if(all(path.new[,3] == c(-1,1))) {
+            cat(k,j,"BAD PATH new!")
+            print(path.new)
+        }
         
-        # path likelihoods
-        path_prob.new <- path_prob(path = path.new, Xcount.other = Xcount.other, pathirm = pathirm.cur, initdist = initdist, tmax = tmax)
-        path_prob.cur <- path_prob(path = path.cur, Xcount.other = Xcount.other, pathirm = pathirm.cur, initdist = initdist, tmax = tmax)
+        # update bookkeeping objects
+        X.new <- X.cur; X.new[X.new[,2] == subjects[j], ] <- path.new; 
+        X.new <- X.new[order(X.new[,1]),]
+        Xcount.new <- build_countmat(X = X.new, popsize = popsize)
+        W.new <- updateW(W = W.cur, Xcount = Xcount.new)
         
-        # compute log acceptance ratio
-        a.prob <- accept_prob(pop_prob.new = pop_prob.new, pop_prob.cur = pop_prob.cur, path_prob.cur = path_prob.cur, path_prob.new = path_prob.new)
+        # calculate acceptance ratio
+        rjmcmc.ratio <- rjmcmc_ratio(W.cur = W.cur, W.new = W.new, Xcount.cur = Xcount.cur, Xcount.new = Xcount.new, path.cur = path.cur, path.new = path.new, initdist = initdist, shift.int = shift.int, insert.prob = insert.prob, remove.prob = remove.prob, shift.prob = shift.prob, b = b, m = m, samp_prob = samp_prob, tmax = tmax, popsize = popsize)
         
-        # accept or reject
-        if(a.prob >=0 || exp(a.prob) > runif(1)) {
+        # decide whether to accept. if accept, update current trajectories
+        if(rjmcmc.ratio > log(runif(1))){
+            
             X.cur <- X.new
             Xcount.cur <- Xcount.new
             W.cur <- W.new
-            pop_prob.cur <- pop_prob.new
             accepts.k <- accepts.k + 1
-        } 
+            
+        }
+        
     }
     
     # save proportion accepted
@@ -180,6 +191,8 @@ for(k in 2:niter){
     p_initinfec[k] <- params.new[5]
     initdist <- params.new[4:6]
     
+    # p_initinfec[k] <- initdist[2]
+    
     loglik[k] <- calc_loglike(Xcount = Xcount.cur, tmax = tmax, W = W.cur, b = Beta[k], m = Mu[k], a = Alpha[k], p = probs[k], initdist = initdist, popsize = popsize)  
     
     if(k%%trajecs_every == 0) {
@@ -190,15 +203,15 @@ end.time <- Sys.time()
 
 total.time <- difftime(end.time, start.time)
 
-results <- list(total.time, quantities = cbind(loglik, Beta, Mu, probs, p_initinfec, suff.stats), trajectories)
+results <- list(total.time, quantities = cbind(loglik, Beta, Mu, probs, p_initinfec, suff.stats, accepts), trajectories)
 
-assign(paste("augSIR_",popsize,censusInterval,samp_prob,resample_prop,sep="_"),results)
+assign(paste("rjmcmc",popsize,censusInterval,samp_prob,resample_prop,initialization_num,sep="_"),results)
 
-save(list = paste("augSIR_",popsize,censusInterval,samp_prob,resample_prop,sep="_"), file = paste(paste("augSIR_",popsize,censusInterval,samp_prob,resample_prop,sep="_"),".Rdata", sep=""))
+save(list = paste("rjmcmc",popsize,censusInterval,samp_prob,resample_prop,initialization_num,sep="_"), file = paste(paste("rjmcmc",popsize,censusInterval,samp_prob,resample_prop,initialization_num,sep="_"),".Rdata", sep=""))
 
 
 # plot stuff
-pdf(file = paste(paste("plots_augSIR",popsize,censusInterval,samp_prob,resample_prop,sep="_"),".pdf", sep=""))
+pdf(file = paste(paste("convcomp_plots_rjmcmc",popsize,censusInterval,samp_prob,resample_prop,initialization_num,sep="_"),".pdf", sep=""))
 par(mfrow = c(4,2))
 ts.plot(results[[2]][,2]); plot(density(results[[2]][,2])); abline(v = b, col = "red", main = "Beta")
 ts.plot(results[[2]][,3]); plot(density(results[[2]][,3])); abline(v = m, col = "red", main = "Mu")
@@ -208,6 +221,7 @@ ts.plot(results[[2]][,5]); plot(density(results[[2]][,5])); abline(v = 0.05, col
 par(mfrow = c(1,1))
 pairs(results[[2]][,2:5])
 ts.plot(loglik, main = "log-likelihood", xlab = "iteration")
+
 
 truetrajec <- data.frame(time = unique(SIRres$trajectory[,1]), 
                          infected = c(sum(SIRres$trajectory[SIRres$trajectory[,1]==0,3]), sum(SIRres$trajectory[SIRres$trajectory[,1]==0,3]) + cumsum(SIRres$trajectory[SIRres$trajectory[,1]!=0,3])),

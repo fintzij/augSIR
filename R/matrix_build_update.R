@@ -17,7 +17,7 @@ build_countmat <- function(X, popsize) {
 }
 
 # build_irm constructs an array of instantaneous rate matrices, with the bottom right entry denoting the number of infecteds. The top left (n-1)x(n-1) matrix is the irm.
-build_irm <- function(Xcount, b, m, a=0, popsize, pop){
+build_irm <- function(Xcount, b, m, a=0, pop){
     
     if(pop == FALSE){ # construct irm array for an individual
         

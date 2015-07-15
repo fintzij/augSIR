@@ -163,11 +163,6 @@ update_rates2 <- function(Xcount, beta.prior, mu.prior, alpha.prior = NULL, init
                     beta_suffstat = sum(numsick*numsusc*timediffs),
                     mu_suffstat = sum(numsick*timediffs))
     
-#     beta.new <- rgamma(1, shape = (beta.prior[1] + sum(infections)), 
-#                        rate = beta.prior[2] + sum(numsick * numsusc * timediffs))
-#     
-#     mu.new <- rgamma(1, shape = (mu.prior[1] + sum(recoveries)), 
-#                      rate = mu.prior[2] + sum(numsick * timediffs))
     beta.new <- rgamma(1, shape = beta.prior[1]+suff.stats[1], rate = beta.prior[2] + suff.stats[3])
     mu.new <- rgamma(1, shape = mu.prior[1] + suff.stats[2], rate = mu.prior[2] + suff.stats[4])
     
