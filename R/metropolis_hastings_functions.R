@@ -141,12 +141,12 @@ update_rates <- function(Xcount, beta.prior, mu.prior, alpha.prior = NULL, initd
     
     params.new <- c(beta.new, mu.new,0, initdist.new)
     
-    if(!is.null(alpha.prior)){
-        alpha.new <- rgamma(1, shape = (alpha.prior[1] + sum(infections)), 
-                            rate = alpha.prior[2] + sum(numsusc * timediffs))
-        
-        params.new[3] <- alpha.new
-    }
+#     if(!is.null(alpha.prior)){
+#         alpha.new <- rgamma(1, shape = (alpha.prior[1] + sum(infections)), 
+#                             rate = alpha.prior[2] + sum(numsusc * timediffs))
+#         
+#         params.new[3] <- alpha.new
+#     }
     
     return(params.new)
 }

@@ -49,7 +49,7 @@ for(R0 in c(2,5,10)){
 dev.off()
 
 # to plot a set of trajectories
-popsize <- 500; censusInterval <- 0.2; R0 = 10; b = R0/popsize; m = 1; tmax = 10; initdist <- c(0.95, 0.05, 0); samp_prob <- 0.05; initialization_num <- 2
+popsize <- 50; censusInterval <- 0.05; R0 = 5; b = R0/popsize; m = 1; tmax = 10; initdist <- c(0.95, 0.05, 0); samp_prob <- 0.05; initialization_num <- 1
 
 
 set.seed(183427)
