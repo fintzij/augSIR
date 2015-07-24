@@ -2,7 +2,7 @@
 
 # set simulation parameters
 niter <- 200
-popsize = 500
+popsize = 50
 samp_prob <- 0.05 
 censusInterval <- 0.05
 tmax = 10
@@ -11,12 +11,12 @@ m <- 1
 initdist <- c(0.95, 0.05, 0)
 trajecs_every <- niter/50
 resample_prop <- 1
+burnin <- niter/2
 
 obstimes <- seq(0, tmax, by = censusInterval)
 
-set.seed(183427)
+set.seed(1834127)
 SIRres <- SIRsim(popsize = popsize, initdist = initdist, b = b, mu = m, a=0, tmax = tmax, censusInterval = censusInterval, sampprob = samp_prob, returnX = TRUE)
-
 
 
 initdist.shift <- runif(1,-0.01,0.01)
@@ -67,6 +67,7 @@ W.cur <- as.matrix(data.frame(time = SIRres$results$time, sampled = SIRres$resul
 
 # set initial distribution
 initdist <- c(1 - W.cur[1,2]/probs[1]/popsize, W.cur[1,2]/probs[1]/popsize, 0)
+initdist <- c(0.95, 0.05, 0)
 p_initinfec[1] <- initdist[2]
 
 # individual trajectories
@@ -94,7 +95,7 @@ writeLines(c(""), paste(paste("augSIR_log",popsize,censusInterval,samp_prob,resa
 start.time <- Sys.time()
 # start sampler
 for(k in 2:niter){
-    
+    print(k)
     if(k %% 5 == 0){
         sink(paste(paste("log",popsize,censusInterval,samp_prob,resample_prop,sep="_"),".txt", sep=""), append=TRUE)  
         cat(paste("Starting iteration",k,"\n"))  
