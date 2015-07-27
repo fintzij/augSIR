@@ -204,3 +204,4 @@ check_count_obs_mats <- function(Xcount, W){
         
     } else return(FALSE)    
 }
+

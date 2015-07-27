@@ -187,3 +187,21 @@ update_prob <- function(W, p.prior){
     rbeta(1,p.prior[1] + sum(W[,2]), p.prior[2] + sum(W[,3]-W[,2]))
     
 }
+
+
+# propose_params generates a vector of new parameters for a M-H update of params
+# params is a vector of parameters
+# kernel is a function that perturbes the parameters on the estimation scale, it should be symmetric
+# toEst is a list of functions that transform the parameters to the estimation scale
+# fromEst is a list of functions that transform the parameters from the estimation scale
+propose_params <- function(params, kernel, toEst, fromEst){
+    
+    params_est <- mapply(do.call, toEst, lapply(params, list))
+    
+    params_new_est <- kernel(params_est)
+    
+    params_new <- mapply(do.call, fromEst, lapply(params_new_est, list))
+    
+    return(params_new)
+    
+}

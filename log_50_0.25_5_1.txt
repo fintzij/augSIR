@@ -1,0 +1,2 @@
+Starting iteration 500 
+Starting iteration 1000 
