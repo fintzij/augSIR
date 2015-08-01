@@ -1,7 +1,7 @@
 library(batch)
 k=j=0
 for (popsize in c(50, 200, 500)) {
-    for (censusInterval in c(0.2)) {
+    for (censusInterval in c(0.1)) {
         for (samp_prob in c(0.05,0.25)) {
             for (resample_prop in c(1)) {
                 for (initialization_num in c(1, 2, 3)) {

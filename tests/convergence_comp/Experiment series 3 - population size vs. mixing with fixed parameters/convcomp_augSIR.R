@@ -67,8 +67,8 @@ tmax <- max(SIRres$results[,1])
 
 
 # vectors for parameters
-Beta <- vector(length = niter); Beta[1] <- b + rnorm(1, 0, 1e-3)
-Mu <- vector(length = niter); Mu[1] <- m + rnorm(1, 0, 1e-3)
+Beta <- vector(length = niter); Beta[1] <- b + rnorm(1, 0, 1e-4)
+Mu <- vector(length = niter); Mu[1] <- m + rnorm(1, 0, 1e-4)
 Alpha <- vector(length = niter); Alpha[1] <- 0
 probs <- vector(length = niter); probs[1] <- samp_prob
 # Beta <- vector(length=niter); Beta[1] <- inits$beta.init
@@ -77,6 +77,7 @@ probs <- vector(length = niter); probs[1] <- samp_prob
 # probs <- vector(length = niter); probs[1] <- inits$probs.init
 p_initinfec <- vector(length = niter)
 suff.stats <- matrix(nrow = niter, ncol = 4); colnames(suff.stats) <- c("num_infec", "num_recov", "beta_suff.stat", "mu_suff.stat")
+R_0 <- vector(length = niter)
 
 accepts <- vector(length = niter)
 
@@ -123,6 +124,7 @@ suff.stats[1,] <- c(numinfec = sum(diff(Xcount.cur[,2], lag = 1)>0),
                     numrecov =  sum(diff(Xcount.cur[,2], lag = 1)<=0), 
                     beta_suffstat = sum(Xcount.cur[1:(nrow(Xcount.cur) - 1),2]*Xcount.cur[1:(nrow(Xcount.cur)-1),3]*diff(Xcount.cur[,1], lag = 1)),
                     mu_suffstat = sum(Xcount.cur[1:(nrow(Xcount.cur) - 1),2]*diff(Xcount.cur[,1], lag = 1)))
+R_0[1] <- Beta[1] * popsize / Mu[1]
 
 writeLines(c(""), paste(paste("augSIR_log",popsize,samp_prob,R0,initialization_num,sep="_"),".txt", sep=""))
 
@@ -222,6 +224,8 @@ for(k in 2:niter){
 
     loglik[k] <- calc_loglike(Xcount = Xcount.cur, tmax = tmax, W = W.cur, b = Beta[k], m = Mu[k], a = Alpha[k], p = probs[k], initdist = initdist, popsize = popsize)  
     
+    R_0[k] <- Beta[k] * popsize / Mu[k]
+    
     if(k%%trajecs_every == 0) {
         trajectories[[1 + k/trajecs_every]] <- Xcount.cur
     }
@@ -230,7 +234,7 @@ end.time <- Sys.time()
 
 total.time <- difftime(end.time, start.time, units = "mins")
 
-results <- list(total.time, quantities = cbind(loglik, Beta, Mu, probs, p_initinfec, suff.stats, accepts), trajectories)
+results <- list(total.time, quantities = cbind(loglik, Beta, Mu, probs, p_initinfec, suff.stats, accepts, R_0), trajectories)
 
 assign(paste("augSIR_",popsize,samp_prob,R0,initialization_num,sep="_"),results)
 
@@ -239,11 +243,12 @@ save(list = paste("augSIR_",popsize,samp_prob,R0,initialization_num,sep="_"), fi
 
 # plot stuff
 pdf(file = paste(paste("convcomp_plots_augSIR",popsize,samp_prob,R0,initialization_num,sep="_"),".pdf", sep=""))
-par(mfrow = c(4,2))
-ts.plot(results[[2]][,2]); plot(density(results[[2]][,"Beta"]), main = "Beta"); abline(v = b, col = "red")
-ts.plot(results[[2]][,3]); plot(density(results[[2]][,"Mu"]), main = "Mu"); abline(v = m, col = "red")
-ts.plot(results[[2]][,4]); plot(density(results[[2]][,"probs"]), main = "Binomial probability"); abline(v = samp_prob, col = "red")
-ts.plot(results[[2]][,5]); plot(density(results[[2]][,"p_initinfec"]), main = "Prob. of infection at time 0"); abline(v = 0.05, col = "red")
+par(mfrow = c(5,2))
+ts.plot(results[[2]][,"Beta"]); plot(density(results[[2]][,"Beta"]), main = "Beta"); abline(v = b, col = "red")
+ts.plot(results[[2]][,"Mu"]); plot(density(results[[2]][,"Mu"]), main = "Mu"); abline(v = m, col = "red")
+ts.plot(results[[2]][,"probs"]); plot(density(results[[2]][,"probs"]), main = "Binomial probability"); abline(v = samp_prob, col = "red")
+ts.plot(results[[2]][,"p_initinfec"]); plot(density(results[[2]][,"p_initinfec"]), main = "Prob. of infection at time 0"); abline(v = 0.05, col = "red")
+ts.plot(results[[2]][,"R_0"]); plot(density(results[[2]][,"R_0"]), main = "R0"); abline(v = 0.05, col = "red")
 
 par(mfrow = c(1,1))
 pairs(results[[2]][seq(1,niter,by=5),1:5])

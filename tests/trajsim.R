@@ -1,21 +1,21 @@
 # evaluating how well the method reconstructs the true trajectory
 
 # set simulation parameters
-niter <- 200
-popsize = 50
-samp_prob <- 0.05 
+niter <- 50
+popsize = 500
+samp_prob <- 0.25 
 censusInterval <- 0.05
 tmax = 10
 b <- 5/popsize
 m <- 1
 initdist <- c(0.95, 0.05, 0)
-trajecs_every <- niter/50
+trajecs_every <- max(1,floor(niter/50))
 resample_prop <- 1
 burnin <- niter/2
 
 obstimes <- seq(0, tmax, by = censusInterval)
 
-set.seed(1834127)
+# set.seed(1834127)
 SIRres <- SIRsim(popsize = popsize, initdist = initdist, b = b, mu = m, a=0, tmax = tmax, censusInterval = censusInterval, sampprob = samp_prob, returnX = TRUE)
 
 
@@ -43,6 +43,7 @@ Mu <- vector(length = niter); Mu[1] <- inits$mu.init
 Alpha <- vector(length = niter); Alpha[1] <- inits$alpha.init 
 probs <- vector(length = niter); probs[1] <- inits$probs.init
 p_initinfec <- vector(length = niter)
+R_0 <- vector(length = niter)
 suff.stats <- matrix(nrow = niter, ncol = 4); colnames(suff.stats) <- c("num_infec", "num_recov", "beta_suff.stat", "mu_suff.stat")
 
 accepts <- vector(length = niter)
@@ -90,6 +91,8 @@ suff.stats[1,] <- c(numinfec = sum(diff(Xcount.cur[,2], lag = 1)>0),
                     beta_suffstat = sum(Xcount.cur[1:(nrow(Xcount.cur) - 1),2]*Xcount.cur[1:(nrow(Xcount.cur)-1),3]*diff(Xcount.cur[,1], lag = 1)),
                     mu_suffstat = sum(Xcount.cur[1:(nrow(Xcount.cur) - 1),2]*diff(Xcount.cur[,1], lag = 1)))
 
+R_0[1] <- Beta[1] * popsize / Mu[1]
+
 writeLines(c(""), paste(paste("augSIR_log",popsize,censusInterval,samp_prob,resample_prop,sep="_"),".txt", sep=""))
 
 start.time <- Sys.time()
@@ -107,7 +110,7 @@ for(k in 2:niter){
     pathirm.cur <- build_irm(Xcount = Xcount.cur, b = Beta[k-1], m = Mu[k-1], a = Alpha[k-1], pop = FALSE)
     patheigen.cur <- irm_decomp(pathirm.cur = pathirm.cur)
     
-    pop_prob.cur <- pop_prob(Xcount = Xcount.cur, tmax = tmax, b = Beta[1], m = Mu[1], a = Alpha[1], initdist = initdist, popsize = popsize)
+    pop_prob.cur <- pop_prob(Xcount = Xcount.cur, tmax = tmax, b = Beta[k-1], m = Mu[k-1], a = Alpha[k-1], initdist = initdist, popsize = popsize)
     
     accepts.k <- 0
     
@@ -181,7 +184,9 @@ for(k in 2:niter){
     p_initinfec[k] <- params.new[5]
     initdist <- params.new[4:6]
     
-    loglik[k] <- calc_loglike(Xcount = Xcount.cur, tmax = tmax, W = W.cur, b = Beta[k], m = Mu[k], a = Alpha[k], p = probs[k], initdist = initdist, popsize = popsize)  
+    loglik[k] <- calc_loglike(Xcount = Xcount.cur, tmax = tmax, W = W.cur, b = Beta[k], m = Mu[k], a = Alpha[k], p = probs[k], initdist = initdist, popsize = popsize) 
+    
+    R_0[k] <- Beta[k] * popsize / Mu[k]
     
     if(k%%trajecs_every == 0) {
         trajectories[[1 + k/trajecs_every]] <- Xcount.cur
@@ -191,7 +196,7 @@ end.time <- Sys.time()
 
 total.time <- difftime(end.time, start.time)
 
-results <- list(total.time, quantities = cbind(loglik, Beta, Mu, probs, p_initinfec, suff.stats), trajectories)
+results <- list(total.time, quantities = cbind(loglik, Beta, Mu, probs, p_initinfec, suff.stats, R_0), trajectories)
 
 assign(paste("augSIR_",popsize,censusInterval,samp_prob,resample_prop,sep="_"),results)
 
@@ -200,14 +205,16 @@ save(list = paste("augSIR_",popsize,censusInterval,samp_prob,resample_prop,sep="
 
 # plot stuff
 pdf(file = paste(paste("plots_augSIR",popsize,censusInterval,samp_prob,resample_prop,sep="_"),".pdf", sep=""))
-par(mfrow = c(4,2))
-ts.plot(results[[2]][,2]); plot(density(results[[2]][,2])); abline(v = b, col = "red", main = "Beta")
-ts.plot(results[[2]][,3]); plot(density(results[[2]][,3])); abline(v = m, col = "red", main = "Mu")
-ts.plot(results[[2]][,4]); plot(density(results[[2]][,4])); abline(v = samp_prob, col = "red", main = "Binomial probability")
-ts.plot(results[[2]][,5]); plot(density(results[[2]][,5])); abline(v = 0.05, col = "red", main = "Prob. of infection at time 0")
+par(mfrow = c(5,2))
+ts.plot(results[[2]][,"Beta"]); plot(density(results[[2]][,"Beta"]), main = "Beta"); abline(v = b, col = "red")
+ts.plot(results[[2]][,"Mu"]); plot(density(results[[2]][,"Mu"]), main = "Mu"); abline(v = m, col = "red")
+ts.plot(results[[2]][,"probs"]); plot(density(results[[2]][,"probs"]), main = "Binomial probability"); abline(v = samp_prob, col = "red")
+ts.plot(results[[2]][,"p_initinfec"]); plot(density(results[[2]][,"p_initinfec"]), main = "Prob. of infection at time 0"); abline(v = 0.05, col = "red")
+ts.plot(results[[2]][,"R_0"]); plot(density(results[[2]][,"R_0"]), main = "R0"); abline(v = 0.05, col = "red")
+
 
 par(mfrow = c(1,1))
-pairs(results[[2]][,2:5])
+pairs(results[[2]][,c(2:5, ncol(results[[2]]))])
 ts.plot(loglik, main = "log-likelihood", xlab = "iteration")
 
 truetrajec <- data.frame(time = unique(SIRres$trajectory[,1]), 

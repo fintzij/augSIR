@@ -1,6 +1,11 @@
 
 # Auxilliary Functions (normalize, checkpossible, find.pprior, find.rateprior, initializeX, get_path, infec_durs) -----------------------------------------
 
+# logit and expit
+
+logit <- function(x) log(x/(1-x))
+expit <- function(x) 1/(1+exp(-x))
+
 # Normalize is what it sounds like.
 normalize <- function(X){
     X/sum(X)

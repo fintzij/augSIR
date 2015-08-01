@@ -10,6 +10,11 @@ accept_prob <- function(pop_prob.new, pop_prob.cur, path_prob.cur, path_prob.new
     }
 }
 
+# accept_prob_param_MH calculates the MH acceptance ratio for a new set of parameters
+accept_prob_param_MH <- function(log_lik.new, log_lik.cur, prior_probs.new, prior_probs.cur){
+    log_lik.new - log_lik.cur + sum(prior_probs.new)- sum(prior_probs.cur)
+}
+
 # obs_prob calculates the binomial probability of observing the data given counts of the infecteds at observation times
 obs_prob <- function(W, p){
     dbinom(x = sum(W[,2]), size = sum(W[,3]), prob = p, log = TRUE)
@@ -194,14 +199,36 @@ update_prob <- function(W, p.prior){
 # kernel is a function that perturbes the parameters on the estimation scale, it should be symmetric
 # toEst is a list of functions that transform the parameters to the estimation scale
 # fromEst is a list of functions that transform the parameters from the estimation scale
-propose_params <- function(params, kernel, toEst, fromEst){
+# which_par is the index in the vector of parameters for which parameter to perturb
+propose_params <- function(which_par, params, kernel, toEst, fromEst){
     
-    params_est <- mapply(do.call, toEst, lapply(params, list))
+    params_est <- sapply(toEst, function(f) f(params))
     
-    params_new_est <- kernel(params_est)
+    params_new_est <- kernel(params = params_est, which_par = which_par)
     
-    params_new <- mapply(do.call, fromEst, lapply(params_new_est, list))
+    params_new <- sapply(fromEst, function(f) f(params_new_est))
     
-    return(params_new)
+    return(list(params_new, params_new_est))
+    
+}
+
+# evaluate_priors evaluates the prior density for a vector of parameter values
+# params is the vector of parameters on the estimation scale
+# d_priors is a list of functions to evaluate the prior densities
+evaluate_priors <- function(params_est, d_priors){
+    
+    prior_dens <- mapply(do.call, d_priors, lapply(params_est, list))
+    
+    return(prior_dens)
+    
+}
+
+update_prior_prob <- function(which_param, prior_probs, params_est, d_priors){
+    
+    prior_probs.new <- prior_probs
+    
+    prior_probs.new[which_param] <- d_priors[[which_param]](params_est[which_param])
+    
+    return(prior_probs.new)
     
 }
