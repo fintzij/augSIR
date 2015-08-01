@@ -10,19 +10,15 @@
 \end{itemize}
 \subsection*{Measures of interest}
 \begin{itemize}
-	\item Proportion of proposed trajectories accepted
-	\item Posterior distributions of model parameters
-	\item Complete data log-likelihood
+	\item Correspondence between true trajectory and augmented population level trajectories
 \end{itemize}
 \subsection*{Summary of results}
 \begin{itemize}
-	\item In small populations (50-200ish) the mcmc mixed well and all three initializations settled around roughly the same log-likelihood. The parameters were better recovered in smaller populations.
-	\item In larger populations, the chains mixed poorly and were stuck in different modes of the likelihood. 
+	\item Overshooting behavior is more apparent in larger populations, and when the observation times are further apart from one another.  
 \end{itemize}
 
 \subsection*{Next steps and other notes}
 \begin{itemize}
-	\item It was thought that the priors, while perhaps appropriate for each parameter separately, could jointly pull the value of $ \R_0 $ away from the true value. Will explore reparameterizing the model in terms of $ \R_0 $  and sampling parameters using M-H. 
-	\item Will run simulations to determine if problems persist with parameters fixed at the true values. 
-	\item Will include posterior samples of $ \R_0 $ in future simulations.  
+	\item The fact that observation times and population size lead to overshooting behavior suggests that the method is sensitive to the amount of missing data. 
+	\item Will run Geweke style simulations alternating between simulating X|Y and Y|X, to compare the distribution of X via our method to the distribution of X simulated via Gillespie.  
 \end{itemize}

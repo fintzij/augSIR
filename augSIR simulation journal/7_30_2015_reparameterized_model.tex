@@ -1,0 +1,21 @@
+\section*{7/30/2015 - Simulations to assess whether reparameterizing model in terms of R0 affects parameter posteriors}
+\subsection*{Simulation parameters}
+\begin{itemize}
+	\item Population size: 50, 150, 300
+	\item $ \R_0 $: 4, 8
+	\item $ \rho: $ 0.1, 0.4
+	\item $ \beta =\frac{\R_0}{\text{population size}} $, $ \mu = 1 $
+	\item Census interval = 0.05, 0.2
+	\item Three initializations for each scenario. $ \log R_0 \sim N(0, 1.8)$, diffuse priors for other parameters.  
+\end{itemize}
+\subsection*{Measures of interest}
+\begin{itemize}
+	\item Posterior distributions of model parameters
+	\item Overshooting behavior of latent trajectories
+\end{itemize}
+\subsection*{Summary of results}
+\begin{itemize}
+	\item Parameters are better recovered than in naively parameterized model. 
+	\item There is generally upward bias in $ R_0 $. 
+	\item Latent trajectories still overshoot the true trajectory. 
+\end{itemize}
