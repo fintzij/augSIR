@@ -1,0 +1,10 @@
+Starting iteration 50 
+Starting iteration 100 
+Starting iteration 150 
+Starting iteration 200 
+Starting iteration 250 
+Starting iteration 300 
+Starting iteration 350 
+Starting iteration 400 
+Starting iteration 500 
+Starting iteration 500 
