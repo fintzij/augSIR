@@ -237,6 +237,99 @@ sim_one_SIR <- function(Xcount, obstimes, b, m, initdist, tmax, returnpath = FAL
     }
 }
 
+
+# Gillespie on extended state space ---------------------------------------
+
+SIRsim_extended <- function(popsize, initdist, b, m, obstimes, samp_prob, trim = TRUE, returnX = TRUE){
+    
+    X <- as.matrix(data.frame(time=rep(0,popsize*2), id=rep(1:popsize,each=2), event=rep(0,2*popsize)))
+    
+    which_initinfec <- which(runif(popsize) < initdist[2])
+    # someone must be initially infected. 
+    if(length(which_initinfec) == 0) {
+        while(length(which_initinfec) == 0){
+            which_initinfec <- which(runif(popsize) < initdist[2])
+        }
+    }
+    
+    whichsusc <- 1:popsize; whichinf <- which_initinfec
+    whichsusc <- whichsusc[-which_initinfec]
+    
+    recov_times <- rep(0, length(whichinf))
+    
+    for(k in 1:length(which_initinfec)){
+        subj_id = which_initinfec[k]
+        X[X[,"id"] == subj_id, "event"][1] <- 1
+        X[X[,"id"] == subj_id, "event"][2] <- -1
+        X[X[,"id"] == subj_id, "time"][2] <- recov_times[k] <- rexp(1, rate = m)
+    }
+    
+    time <- 0; tmax = max(obstimes)
+    
+    while(length(whichinf) != 0){
+        
+        if(length(whichsusc) == 0){
+            infec_times <- Inf
+        } else {
+            infec_times <- time + rexp(length(whichsusc), rate = b * length(whichinf))
+        } 
+
+        if(min(infec_times) < min(recov_times)){ #infection occurs
+            time <- min(infec_times)
+            subj <- whichsusc[which.min(infec_times)]
+            X[X[,"id"] == subj, "time"][1] <- time
+            X[X[,"id"] == subj, "event"][1] <- 1
+            
+            # draw recovery
+            X[X[,"id"] == subj, "time"][2] <- time + rexp(1, rate = m)
+            X[X[,"id"] == subj, "event"][2] <- -1
+            
+            recov_times <- c(recov_times, X[X[,"id"] == subj, "time"][2])
+            
+            whichinf <- c(whichinf, subj)
+            whichsusc <- whichsusc[whichsusc != subj]
+            
+        } else { #recovery occurs
+            time <- min(recov_times)
+            whichinf <- whichinf[-which.min(recov_times)]
+            
+            recov_times <- recov_times[recov_times > time]
+        }
+        
+    }
+    
+    X[X[,"time"] > tmax, c("time","event")] <- 0
+    X <- X[order(X[,"time"],X[,"event"]),]  
+    
+    Xcount <- build_countmat(X, popsize)
+    
+    # build observation matrix
+    SIRres <- data.frame(time = obstimes,
+                         Observed = 0, 
+                         Truth = 0)
+    
+    # get true counts of infecteds
+    for(j in 1:length(obstimes)){
+        SIRres[j,"Truth"] <- Xcount[sum(Xcount[,"time"] <= obstimes[j]), "numsick"]
+    }
+    
+    # get binomial counts of infecteds
+    SIRres[,"Observed"] <- rbinom(length(obstimes), SIRres[,"Truth"], samp_prob)
+    
+    if(trim == TRUE){
+        if(any(SIRres[,3] == 0)){
+            ind <- which(SIRres[,3] == 0)[1]
+            SIRres <- SIRres[1:ind,]
+        }
+    }
+    
+    if(returnX == FALSE){
+        return(SIRres)
+    } else {
+        return(list(results = SIRres, trajectory = X))
+    }
+}
+
 # sim_one_tpms simulates infection statuses at a sequence of observation times directly from transition probability matrices
 sim_one_tpms <- function(tpms, initdist) {
     states <- rep(0, dim(tpms)[3] + 1)

@@ -1,0 +1,28 @@
+\subsection*{Corrections to likelihood made on 8/4/2015}
+The epidemic process was recognized to evolve on the expanded state space of vectors. The likelihood was corrected to reflect that the skeleton probabilities should be specified at the individual level, not the space of lumped counts. The probability of being initially infected was also corrected to be N-dimensional categorical distributed instead of multinomial. The correctness of the new likelihood was confirmed via Geweke simulation, described next. 
+\section*{8/7/2015 - Geweke style simulations with fixed parameters to verify the corrected likelihood }
+\subsection*{Setup}
+We want to determine whether we are targeting the correct joint distribution of $ \bX $ and $ \bY $ with our data augmentation method for simulating trajectories. To do this, we alternate simulating $ \bX | \bY $ and $ \bY | \bX $ using our method. We then discard the samples of $ \bY $ to retain the marginal distribution of $ \bX $, which should match the distribution of $ \bX $, simulated by Gillespie.
+
+\subsection*{Simulation parameters}
+\begin{itemize}
+	\item \# iterations; $ 3\times 10^6 $
+	\item R0: 4
+	\item $ \mu $: 1
+	\item Population size: 10
+\end{itemize}
+
+\subsection*{Measures of interest}
+\begin{itemize}
+	\item Epidemic curve with MCSE bands.
+\end{itemize}
+
+\subsection*{Summary of results}
+\begin{itemize}
+	\item The confidence band for the marginal distribution of $ \bX $ via Gillespie falls completely within the confidence band of the marginal distribution simulated using our method. 
+\end{itemize}
+
+\subsection*{Next steps}
+\begin{itemize}
+	\item Simulations to assess the effects of population size, census interval, sampling probability, and R0. 
+\end{itemize}

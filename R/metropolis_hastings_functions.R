@@ -35,7 +35,7 @@ calc_loglike <- function(Xcount, tmax, W,  b, m, a=0, p, initdist, popsize){
     
     hazards <- infec.rates + recov.rates
     
-    rates <- ifelse(events==1, infec.rates, recov.rates)
+    rates <- ifelse(events==1, infec.rates/numsusc, recov.rates/numinf)
     
     dbinom(sum(W[,2]), sum(W[,3]), prob=p, log=TRUE) + dmultinom(c(Xcount[1,3], Xcount[1,2], 0), prob = initdist, log=TRUE) + sum(log(rates[1:(indend - 1)])) - sum(hazards[1:(indend - 1)]*diff(Xcount[,1], lag = 1)) - hazards[indend]*max(0,tmax - Xcount[indend,1])
     
@@ -54,15 +54,56 @@ pop_prob <- function(Xcount, tmax, b, m, a = 0, initdist, popsize){
     
     infec.rates <- (b * numinf + a) * numsusc
     recov.rates <- m * numinf
-    
+  
     hazards <- infec.rates + recov.rates
     
-    rates <- ifelse(events==1, infec.rates, recov.rates)
+    rates <- ifelse(events==1, infec.rates/numsusc, recov.rates/numinf)
     
-    dmultinom(c(Xcount[1,3], Xcount[1,2], 0), prob = initdist, log=TRUE) + sum(log(rates[1:(indend - 1)])) - sum(hazards[1:(indend - 1)]*diff(Xcount[,1], lag = 1)) - hazards[indend]*max(0,tmax - Xcount[indend,1])
-    
+    Xcount[1,2]*log(initdist[2]) + Xcount[1,3] * log(initdist[1]) + sum(log(rates[1:(indend - 1)])) - sum(hazards[1:(indend - 1)]*diff(Xcount[,1], lag = 1)) - hazards[indend]*max(0,tmax - Xcount[indend,1])
+
 }
 
+# path_prob <- function(path, fbmats, tpms, Xcount.other, obstimes){
+#     
+#     # set up vectors for discrete state sequences
+#     obstime_seq <- rep(0, dim(fbmats)[3] + 1)
+#     eventtime_seq <- rep(0, nrow(Xcount.other))
+#     
+#     # fill in vectors of discrete state sequences
+#     if(all(path == 0)){ #no infection observed
+#         obstime_seq[1:length(obstime_seq)] <- 1
+#         eventtime_seq[1:length(eventtime_seq)] <- 1
+#     } else {
+#         obstime_seq[obstimes < path[1]] <- 1
+#         obstime_seq[obstimes >= path[1] & obstimes < path[2]] <- 2
+#         obstime_seq[obstimes >= path[2]] <- 3
+#         
+#         eventtime_seq[Xcount.other[,"time"] < path[1]] <- 1
+#         eventtime_seq[Xcount.other[,"time"] < path[2] & Xcount.other[,"time"]>= path[1]] <- 2
+#         eventtime_seq[Xcount.other[,"time"] >= path[2]] <- 3
+#     }
+#     
+#     HMM_probs <- rep(0, length(obstime_seq))
+#     eventtime_probs <- rep(0, length(eventtime_seq))
+#     
+#     # retrieve sequence of FB probabilities
+#     HMM_probs[length(HMM_probs)] <- normalize(colSums(fbmats[,,dim(fbmats)[3]]))[obstime_seq[length(HMM_probs)]]
+#     for(k in (length(HMM_probs)-1):1){
+#         HMM_probs[k] <- normalize(fbmats[,obstime_seq[k+1],k])[obstime_seq[k]]
+#     }
+#     
+#     # retrieve event time probability and discrete time skeleton probabilities if necessary
+#     # first the case where the fb draw is that the state of the subject is unchanged at all observation times
+#     if(all(obstime_seq == 1) || all(obstime_seq == 2)){
+#         eventtime_probs[1:length(eventtime_probs)] <- 1
+#     } else { # at least one transition is observed
+#         changetimes <- which(diff(obstime_seq, lag = 1) != 0)
+#         
+#         if(length(changetimes) == 2){ 
+#             
+#         }
+#     }
+# }
 
 path_prob <- function(path, Xcount.other, pathirm, initdist, tmax){
     indend <- dim(Xcount.other)[1]; init.infec <- Xcount.other[1,2]

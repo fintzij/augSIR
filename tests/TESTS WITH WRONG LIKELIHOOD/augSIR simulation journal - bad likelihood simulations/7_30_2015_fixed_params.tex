@@ -1,0 +1,24 @@
+\section*{7/30/2015 - Simulations to assess overshooting behavior with fixed parameters}
+\subsection*{Simulation parameters}
+\begin{itemize}
+	\item Population size: 50, 150, 300
+	\item $ \R_0 $: 4, 8
+	\item $ \rho: $ 0.1, 0.4
+	\item $ \beta =\frac{\R_0}{\text{population size}} $, $ \mu = 1 $
+	\item Census interval = 0.05, 0.2
+	\item Ten different initializations for each scenario
+\end{itemize}
+\subsection*{Measures of interest}
+\begin{itemize}
+	\item Correspondence between true trajectory and augmented population level trajectories
+\end{itemize}
+\subsection*{Summary of results}
+\begin{itemize}
+	\item Overshooting behavior is more apparent in larger populations, and when the observation times are further apart from one another.  
+\end{itemize}
+
+\subsection*{Next steps and other notes}
+\begin{itemize}
+	\item The fact that observation times and population size lead to overshooting behavior suggests that the method is sensitive to the amount of missing data. 
+	\item Will run Geweke style simulations alternating between simulating X|Y and Y|X, to compare the distribution of X via our method to the distribution of X simulated via Gillespie.  
+\end{itemize}
