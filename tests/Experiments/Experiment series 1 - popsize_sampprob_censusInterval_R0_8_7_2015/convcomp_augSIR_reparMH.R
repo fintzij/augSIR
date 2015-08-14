@@ -1,4 +1,5 @@
 library(batch)
+library(ggplot2)
 source("augSIR.R")
 source("auxilliary_functions.R")
 source("SIRsimulation.R")
@@ -263,6 +264,12 @@ for(k in 2:niter){
     
     if(k%%trajecs_every == 0) {
         trajectories[[1 + k/trajecs_every]] <- Xcount.cur
+    }
+    
+    if(k == 200 && all(traj_accepts == 0)){
+        sink(paste(paste("BAD_INITIALIZATION",popsize,censusInterval,samp_prob,R0,initialization_num,sep="_"),".txt", sep=""), append=TRUE)  
+        cat("SAMPLER HAS NOT ACCEPTED ANY TRAJECTORIES!")  
+        sink()
     }
 }
 end.time <- Sys.time()

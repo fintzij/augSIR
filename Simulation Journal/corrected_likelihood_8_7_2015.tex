@@ -2,27 +2,42 @@
 The epidemic process was recognized to evolve on the expanded state space of vectors. The likelihood was corrected to reflect that the skeleton probabilities should be specified at the individual level, not the space of lumped counts. The probability of being initially infected was also corrected to be N-dimensional categorical distributed instead of multinomial. The correctness of the new likelihood was confirmed via Geweke simulation, described next. 
 \section*{8/7/2015 - Geweke style simulations with fixed parameters to verify the corrected likelihood }
 \subsection*{Setup}
-We want to determine whether we are targeting the correct joint distribution of $ \bX $ and $ \bY $ with our data augmentation method for simulating trajectories. To do this, we alternate simulating $ \bX | \bY $ and $ \bY | \bX $ using our method. We then discard the samples of $ \bY $ to retain the marginal distribution of $ \bX $, which should match the distribution of $ \bX $, simulated by Gillespie.
+We want to determine whether we are targeting the correct joint distribution of $ \bX $ and $ \bY $ with our data augmentation method for simulating trajectories. To do this, we alternate simulating $ \bX | \bY $ and $ \bY | \bX $ using our method. We then discard the samples of $ \bY $ to retain the marginal distribution of $ \bX $, which should match the distribution of $ \bX $, simulated by Gillespie.\\
+
+A second set of simulations was initiated to determine whether the simulated trajectories matched the true latent trajectory. This was done for a number of population sized, census intervals, values for $ R_0 $, and binomial sampling probabilities. The model was reparameterized in terms of $ R_0 $
 
 \subsection*{Simulation parameters}
+Geweke simulations:
 \begin{itemize}
 	\item \# iterations; $ 3\times 10^6 $
-	\item R0: 4
+	\item $ R_0 $: 4, 8
 	\item $ \mu $: 1
-	\item Population size: 10
+	\item Population size: 10, 20
+\end{itemize}
+
+Latent trajectory simulations:
+\begin{itemize}
+	\item \# iterations: 10,000
+	\item $ R_0 $: 4, 8
+	\item Census interval: 0.05, 0.2, 0.4
+	\item Binomial probability: 0.1, 0.4
+	\item Population size: 50, 200, 500
 \end{itemize}
 
 \subsection*{Measures of interest}
 \begin{itemize}
-	\item Epidemic curve with MCSE bands.
+	\item Geweke: Epidemic curve with MCSE bands.
+	\item Latent trajectories: Overlap with true trajectory and posteriors of parameters.
 \end{itemize}
 
 \subsection*{Summary of results}
 \begin{itemize}
 	\item The confidence band for the marginal distribution of $ \bX $ via Gillespie falls completely within the confidence band of the marginal distribution simulated using our method. 
+	\item Acceptance probabilities for parameters in M-H were low. 
 \end{itemize}
 
 \subsection*{Next steps}
 \begin{itemize}
-	\item Simulations to assess the effects of population size, census interval, sampling probability, and R0. 
+	\item Simulations to assess the effects of population size, census interval, sampling probability, and R0 with tuned proposals for $ R_0  $ and $ \mu $. 
+	\item Simulations to assess the effect of number of resampled individuals on the ESS and autocorrelation of parameters.
 \end{itemize}
