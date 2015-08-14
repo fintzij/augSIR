@@ -1,13 +1,13 @@
 library(batch)
 k=0
-for (popsize in c(50, 200, 500, 1000, 2500, 5000, 10000)) {
-    for (censusInterval in c(0.05, 0.2, 0.4)) {
-        for (samp_prob in c(0.1,0.4)) {
+for (popsize in c(10, 20)) {
+    for (censusInterval in c(0.1)) {
+        for (samp_prob in c(0.1, 0.4)) {
             for (resample_prop in c(1)) {
                 for (initialization_num in 1) {
                     for(R0 in c(4, 8)){
                         k = k+1
-                        rbatch("./convcomp_augSIR_reparMH.R", seed = k, popsize = popsize, censusInterval = censusInterval, samp_prob = samp_prob, resample_prop = resample_prop, initialization_num = initialization_num, R0 = R0)
+                        rbatch("./convcomp_augSIR_geweke.R", seed = k, popsize = popsize, censusInterval = censusInterval, samp_prob = samp_prob, resample_prop = resample_prop, initialization_num = initialization_num, R0 = R0)
                     }
                 }
             }

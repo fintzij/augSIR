@@ -1,0 +1,6 @@
+Starting iteration 100 
+Starting iteration 200 
+Starting iteration 300 
+Starting iteration 100 
+Starting iteration 200 
+Starting iteration 300 
